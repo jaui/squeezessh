@@ -76,6 +76,12 @@ android {
     }
 }
 
+ksp {
+    // Exportiertes Room-Schema wird eingecheckt: so werden Schema-Aenderungen im
+    // Review sichtbar und Migrationstests koennen dagegen laufen.
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
@@ -125,6 +131,7 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.androidx.room.testing)
+    testImplementation(libs.androidx.test.junit)
 
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)
