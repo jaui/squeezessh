@@ -1,0 +1,41 @@
+# --- Referenzmaterial: darf NIEMALS ins Repo ---
+# Die JuiceSSH-APK und alles daraus Entpackte ist proprietaeres Fremdmaterial
+# und dient ausschliesslich als Verhaltens-Referenz. Siehe docs/reverse-engineering-notes.md.
+/apk/
+/reference/
+
+# --- Gradle / Build ---
+.gradle/
+build/
+/local.properties
+/captures/
+.cxx/
+*.apk
+*.aab
+*.aar
+*.ap_
+*.dex
+*.class
+
+# --- Android Studio / IntelliJ ---
+.idea/
+*.iml
+*.ipr
+*.iws
+.navigation/
+
+# --- Keystores und Secrets ---
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+!debug.keystore
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Sonstiges ---
+*.log
+/scratch/

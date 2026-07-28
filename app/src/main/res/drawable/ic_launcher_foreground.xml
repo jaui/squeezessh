@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Platzhalter-Icon: Terminal-Prompt ">_". Wird spaeter durch ein richtiges Icon ersetzt. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,38 L36,46 L48,54 L36,62 L36,70 L58,54 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M62,64 L62,72 L78,72 L78,64 Z" />
+</vector>

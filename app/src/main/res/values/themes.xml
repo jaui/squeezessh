@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose uebernimmt das eigentliche Theming; das hier ist nur das Start-Theme. -->
+    <style name="Theme.SqueezeSsh" parent="android:Theme.Material.NoActionBar" />
+</resources>
