@@ -1,12 +1,14 @@
 # Roadmap
 
-Fachliche Grundlage: [`reverse-engineering-notes.md`](reverse-engineering-notes.md).
+Fachliche Grundlage: [`reverse-engineering-notes.md`](reverse-engineering-notes.md) für
+den Funktionsumfang, [`juicessh-datenformat.md`](juicessh-datenformat.md) für das
+Speicherformat des Originals.
 
 | | Meilenstein | Status |
 |---|---|---|
 | M0 | Projekt-Setup, Git-Repo, Referenz-Workspace | ✅ erledigt |
 | M1 | Datenschicht: Room-Entities, Repositories, Keystore-Krypto | ✅ erledigt |
-| M2 | Import bestehender JuiceSSH-Datenbanken | offen |
+| M2 | Import bestehender JuiceSSH-Datenbanken | ✅ erledigt |
 | M3 | SSH-Core auf SSHJ inkl. Known Hosts und Jump-Host-Chaining | offen |
 | M4 | Terminal auf Termux-Emulator | offen |
 | M5 | Address Book UI | offen |

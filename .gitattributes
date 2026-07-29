@@ -3,6 +3,7 @@
 *.bat        text eol=crlf
 gradlew      text eol=lf
 *.jar        binary
+*.db         binary
 *.png        binary
 *.jpg        binary
 *.webp       binary
