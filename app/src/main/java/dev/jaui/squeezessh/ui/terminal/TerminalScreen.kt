@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -21,6 +23,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -56,6 +60,8 @@ fun TerminalScreen(
     connectionId: Long?,
     onBack: () -> Unit,
     onAddSession: () -> Unit,
+    onOpenFiles: () -> Unit,
+    onOpenForwards: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: TerminalViewModel = hiltViewModel(),
 ) {
@@ -75,10 +81,15 @@ fun TerminalScreen(
 
     val activeTab = tabs.firstOrNull { it.id == activeTabId }
 
+    // Der Terminal-Bildschirm bringt bewusst kein Scaffold mit — er soll die volle
+    // Flaeche nutzen. Die Systemleisten muss er deshalb selbst aussparen, sonst liegt die
+    // Tab-Leiste unter der Statusleiste und ist nicht antippbar.
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
+            .statusBarsPadding()
+            .navigationBarsPadding()
             .imePadding(),
     ) {
         // Die Tab-Leiste liegt bewusst **ueber** dem Terminal statt darueber im Column:
@@ -148,6 +159,8 @@ fun TerminalScreen(
                     onSelect = viewModel::activateTab,
                     onClose = viewModel::closeTab,
                     onAdd = onAddSession,
+                    onOpenFiles = onOpenFiles,
+                    onOpenForwards = onOpenForwards,
                 )
             }
         }
@@ -237,6 +250,8 @@ private fun TabStrip(
     onSelect: (Long) -> Unit,
     onClose: (Long) -> Unit,
     onAdd: () -> Unit,
+    onOpenFiles: () -> Unit,
+    onOpenForwards: () -> Unit,
 ) {
     // Bewusst kein Material3-Tab: das bezieht seine Farben aus dem Umfeld einer TabRow und
     // waere hier, auf schwarzem Terminal-Hintergrund, unsichtbar. Die Leiste bringt ihre
@@ -286,6 +301,20 @@ private fun TabStrip(
             Icon(
                 Icons.Default.Add,
                 contentDescription = "Weitere Sitzung",
+                tint = TAB_ACTIVE_TEXT,
+            )
+        }
+        IconButton(onClick = onOpenFiles) {
+            Icon(
+                Icons.Default.Folder,
+                contentDescription = "Dateien",
+                tint = TAB_ACTIVE_TEXT,
+            )
+        }
+        IconButton(onClick = onOpenForwards) {
+            Icon(
+                Icons.Default.SwapHoriz,
+                contentDescription = "Weiterleitungen",
                 tint = TAB_ACTIVE_TEXT,
             )
         }

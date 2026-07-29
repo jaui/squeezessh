@@ -24,7 +24,9 @@ import dev.jaui.squeezessh.ui.addressbook.ConnectionEditorViewModel
 import dev.jaui.squeezessh.ui.addressbook.IdentityEditorScreen
 import dev.jaui.squeezessh.ui.addressbook.IdentityEditorViewModel
 import dev.jaui.squeezessh.ui.addressbook.IdentityListScreen
+import dev.jaui.squeezessh.ui.forward.PortForwardScreen
 import dev.jaui.squeezessh.ui.importer.ImportScreen
+import dev.jaui.squeezessh.ui.sftp.SftpBrowserScreen
 import dev.jaui.squeezessh.ui.terminal.TerminalScreen
 import dev.jaui.squeezessh.ui.theme.SqueezeSshTheme
 
@@ -76,6 +78,14 @@ private fun SqueezeSshApp(intent: Intent?) {
         }
 
         composable(Route.IMPORT) { ImportScreen() }
+
+        composable(Route.SFTP) {
+            SftpBrowserScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Route.FORWARDS) {
+            PortForwardScreen(onBack = { navController.popBackStack() })
+        }
 
         composable(Route.IDENTITIES) {
             IdentityListScreen(
@@ -135,6 +145,8 @@ private fun SqueezeSshApp(intent: Intent?) {
                 connectionId = id.takeIf { it != NO_CONNECTION },
                 onBack = { navController.popBackStack() },
                 onAddSession = { navController.navigate(Route.ADDRESS_BOOK) },
+                onOpenFiles = { navController.navigate(Route.SFTP) },
+                onOpenForwards = { navController.navigate(Route.FORWARDS) },
             )
         }
     }
@@ -163,4 +175,6 @@ private object Route {
     const val CONNECTION_EDITOR = "connection"
     const val IDENTITY_EDITOR = "identity"
     const val TERMINAL = "terminal"
+    const val SFTP = "sftp"
+    const val FORWARDS = "forwards"
 }

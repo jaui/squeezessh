@@ -82,15 +82,22 @@ class SshSessionManager @Inject constructor(
         return session
     }
 
-    suspend fun close(sessionId: Long) {
+    /**
+     * Schliessen laeuft wie das Oeffnen im Hintergrund.
+     *
+     * Ein Kanalabbau schickt Pakete ueber die Leitung. Auf dem Hauptthread wirft Android
+     * dabei — mitten im Schreiben — und der Server verwirft die *gesamte* Verbindung als
+     * „Bad packet length". Das trifft dann auch alle anderen Kanaele darauf.
+     */
+    suspend fun close(sessionId: Long) = withContext(io) {
         lock.withLock {
-            val session = sessions.value[sessionId] ?: return
+            val session = sessions.value[sessionId] ?: return@withContext
             session.close()
             sessions.update { it - sessionId }
         }
     }
 
-    suspend fun closeAll() {
+    suspend fun closeAll() = withContext(io) {
         lock.withLock {
             sessions.value.values.forEach { it.close() }
             sessions.value = emptyMap()
@@ -103,13 +110,15 @@ class SshSessionManager @Inject constructor(
      * Ein weggebrochener Server schliesst den Kanal, ohne dass wir es aktiv merken —
      * ohne Aufraeumen bliebe eine tote Kachel in der Oberflaeche stehen.
      */
-    suspend fun pruneDead(): List<Long> = lock.withLock {
+    suspend fun pruneDead(): List<Long> = withContext(io) {
+        lock.withLock {
         val dead = sessions.value.filterValues { !it.isAlive }.keys.toList()
         if (dead.isNotEmpty()) {
             dead.forEach { sessions.value[it]?.close() }
             sessions.update { current -> current - dead.toSet() }
+            }
+            dead
         }
-        dead
     }
 
     private suspend fun ConnectionEntity.toHop(): SshHop {
@@ -153,6 +162,13 @@ class SshSession internal constructor(
     private val connection: SshConnection,
     val shell: SshShell,
 ) : AutoCloseable {
+
+    /**
+     * Die Verbindung darunter — fuer alles, was denselben Kanal mitbenutzt, etwa SFTP
+     * oder Weiterleitungen. Eine zweite Verbindung wuerde erneut nach Host-Key und
+     * Zugangsdaten fragen und auf dem Server als weitere Anmeldung auftauchen.
+     */
+    internal val sshConnection: SshConnection get() = connection
 
     val isAlive: Boolean get() = connection.isConnected && shell.isOpen
 

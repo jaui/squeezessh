@@ -6,12 +6,14 @@ import dev.jaui.squeezessh.ssh.SshConnectionState
 import dev.jaui.squeezessh.ssh.SshSession
 import dev.jaui.squeezessh.ssh.SshSessionManager
 import dev.jaui.squeezessh.ssh.SshSessionService
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -26,6 +28,7 @@ import javax.inject.Singleton
 @Singleton
 class TerminalTabs @Inject constructor(
     private val sessions: SshSessionManager,
+    private val io: CoroutineDispatcher,
 ) {
 
     /**
@@ -135,9 +138,11 @@ class TerminalTabs @Inject constructor(
         if (_tabs.value.any { it.id == tabId }) _activeTabId.value = tabId
     }
 
+    /** Wie beim SessionManager: Abbau schickt Pakete und gehoert nicht auf den Hauptthread. */
     suspend fun close(context: Context, tabId: Long) {
+        withContext(io) {
         lock.withLock {
-            val tab = _tabs.value.firstOrNull { it.id == tabId } ?: return
+            val tab = _tabs.value.firstOrNull { it.id == tabId } ?: return@withContext
             tab.onScreenUpdated = null
             tab.bridge.close()
             sessions.close(tabId)
@@ -148,10 +153,12 @@ class TerminalTabs @Inject constructor(
                 _activeTabId.value = remaining.lastOrNull()?.id
             }
         }
+        }
         if (_tabs.value.isEmpty()) SshSessionService.stop(context)
     }
 
     suspend fun closeAll(context: Context) {
+        withContext(io) {
         lock.withLock {
             _tabs.value.forEach {
                 it.onScreenUpdated = null
@@ -160,6 +167,7 @@ class TerminalTabs @Inject constructor(
             sessions.closeAll()
             _tabs.value = emptyList()
             _activeTabId.value = null
+        }
         }
         SshSessionService.stop(context)
     }

@@ -12,7 +12,7 @@ Speicherformat des Originals.
 | M3 | SSH-Core auf SSHJ inkl. Known Hosts und Jump-Host-Chaining | ✅ erledigt |
 | M4 | Terminal auf Termux-Emulator | ✅ erledigt |
 | M5 | Address Book UI | ✅ erledigt |
-| M6 | Port-Forwarding und SFTP | offen |
+| M6 | Port-Forwarding und SFTP | ✅ erledigt |
 | M7 | Settings, Snippets, App-Lock, Widget | offen |
 | M8 | EC2-Sync | offen |
 | M9 | Plugin-API-Kompatibilität | offen |
@@ -44,9 +44,23 @@ im selben `Box` wie die eingebettete View. Zwei Gründe, beide praktisch:
 wären Host und Port nach dem ersten Ziffernanschlag getrennt und die restlichen Ziffern
 landeten im falschen Feld. Eine Zeile unter dem Feld zeigt vorher an, was verstanden wurde.
 
-**Noch nicht umgesetzt aus M4/M5:** umschaltbare Schriftarten in der Oberfläche (Themes und
+**SOCKS5 ist selbst geschrieben.** SSHJ kennt nur feste Ziel-Paare; ein dynamischer
+Tunnel (`ssh -D`) bestimmt sein Ziel dagegen pro Verbindung. `Socks5Server` setzt den Teil
+von RFC 1928 um, den Browser und `curl --socks5` benutzen: Anmeldung ohne
+Authentifizierung und CONNECT. BIND und UDP ASSOCIATE fehlen — beides braucht über einen
+SSH-Tunnel praktisch niemand und wäre ohne Gegenstelle nicht testbar.
+
+**Jeder Abbau von SSH-Ressourcen läuft im Hintergrund.** Ein Kanalabbau schickt Pakete;
+auf dem Hauptthread wirft Android dabei mitten im Schreiben, und der Server verwirft die
+*gesamte* Verbindung als „Bad packet length" — samt aller anderen Kanäle darauf. Betrifft
+`SshSessionManager.close`, `TerminalTabs.close` und den SFTP-Kanal beim Verlassen des
+Browsers.
+
+**Noch nicht umgesetzt aus M4/M5/M6:** umschaltbare Schriftarten in der Oberfläche (Themes und
 Schnittstelle stehen), Umsortieren von Identitäten pro Verbindung (die Reihenfolge wird
-gespeichert, ist aber noch nicht per Drag änderbar), Export privater Schlüssel.
+gespeichert, ist aber noch nicht per Drag änderbar), Export privater Schlüssel,
+Fortschritts-Notification für Übertragungen (Fortschritt, Pause, Fortsetzen und Abbruch
+gibt es im Dateibrowser, aber noch nicht in der Statusleiste).
 
 ## Offene Entscheidungen
 
