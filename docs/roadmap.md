@@ -31,9 +31,16 @@ geschrieben sind nur Größenrechnung, Gesten und Tastatur-Anbindung
 (`terminal/TerminalView.kt`). Die Geometrie folgt bewusst exakt Termux' Rechnung — eine
 abweichende Zeilenzahl fällt sonst erst auf, wenn `vim` krumm zeichnet.
 
-**Noch nicht umgesetzt aus M4:** Textauswahl mit Griffen (nur programmatisches Kopieren),
-mehrere Sitzungen in Tabs, umschaltbare Schriftarten in der Oberfläche (die Themes und die
-Schnittstelle dafür stehen).
+**Leisten liegen über dem Terminal, nicht daneben.** Tab- und Auswahlleiste sind Overlays
+im selben `Box` wie die eingebettete View. Zwei Gründe, beide praktisch:
+
+- Eine `AndroidView` wird als echte View **nach** dem Compose-Inhalt gezeichnet und
+  verdeckt eine im `Column` davor liegende Leiste vollständig.
+- Nähme eine Leiste Platz weg, änderte sich die Zeilenzahl, das Terminal vermäße sich neu
+  — und verwürfe dabei genau die Auswahl, die die Leiste anzeigt.
+
+**Noch nicht umgesetzt aus M4:** umschaltbare Schriftarten in der Oberfläche (die Themes
+und die Schnittstelle dafür stehen).
 
 ## Offene Entscheidungen
 

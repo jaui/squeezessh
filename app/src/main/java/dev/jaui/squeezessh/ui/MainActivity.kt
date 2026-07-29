@@ -41,27 +41,39 @@ private fun SqueezeSshApp() {
         ) {
             composable(Route.HOME) {
                 HomeScreen(
-                    onOpenConnection = { id -> navController.navigate("${Route.TERMINAL}/$id") },
+                    onOpenConnection = { id ->
+                        navController.navigate("${Route.TERMINAL}?${Route.ARG_CONNECTION_ID}=$id")
+                    },
                     onOpenImport = { navController.navigate(Route.IMPORT) },
                 )
             }
 
             composable(Route.IMPORT) { ImportScreen() }
 
+            // Der Verbindungs-Parameter ist optional: das Terminal ist auch ohne neues
+            // Ziel erreichbar, wenn bereits Sitzungen offen sind.
             composable(
-                route = "${Route.TERMINAL}/{${Route.ARG_CONNECTION_ID}}",
+                route = "${Route.TERMINAL}?${Route.ARG_CONNECTION_ID}={${Route.ARG_CONNECTION_ID}}",
                 arguments = listOf(
-                    navArgument(Route.ARG_CONNECTION_ID) { type = NavType.LongType },
+                    navArgument(Route.ARG_CONNECTION_ID) {
+                        type = NavType.LongType
+                        defaultValue = NO_CONNECTION
+                    },
                 ),
             ) { entry ->
+                val id = entry.arguments?.getLong(Route.ARG_CONNECTION_ID) ?: NO_CONNECTION
                 TerminalScreen(
-                    connectionId = entry.arguments?.getLong(Route.ARG_CONNECTION_ID) ?: 0L,
+                    connectionId = id.takeIf { it != NO_CONNECTION },
                     onBack = { navController.popBackStack() },
+                    onAddSession = { navController.navigate(Route.HOME) },
                 )
             }
         }
     }
 }
+
+/** Kein Ziel mitgegeben — das Terminal zeigt dann nur die bereits offenen Sitzungen. */
+private const val NO_CONNECTION = -1L
 
 private object Route {
     const val HOME = "home"

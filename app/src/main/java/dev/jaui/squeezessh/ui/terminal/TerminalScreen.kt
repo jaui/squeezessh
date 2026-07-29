@@ -2,9 +2,9 @@ package dev.jaui.squeezessh.ui.terminal
 
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.Context
 import android.view.KeyEvent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,13 +12,21 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -38,59 +47,112 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.jaui.squeezessh.terminal.TerminalBridge
+import dev.jaui.squeezessh.terminal.TerminalTabs
 import dev.jaui.squeezessh.terminal.TerminalTheme
 import dev.jaui.squeezessh.terminal.TerminalView
 
 @Composable
 fun TerminalScreen(
-    connectionId: Long,
+    connectionId: Long?,
     onBack: () -> Unit,
+    onAddSession: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: TerminalViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val tabs by viewModel.tabs.tabs.collectAsStateWithLifecycle()
+    val activeTabId by viewModel.tabs.activeTabId.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
     var terminalView by remember { mutableStateOf<TerminalView?>(null) }
     var controlActive by remember { mutableStateOf(false) }
     var altActive by remember { mutableStateOf(false) }
+    var selectedText by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(connectionId) { viewModel.connect(connectionId) }
+    // Ein per Navigation mitgegebenes Ziel wird genau einmal geoeffnet — sonst entstuende
+    // bei jeder Neuzusammensetzung eine weitere Sitzung.
+    LaunchedEffect(connectionId) { connectionId?.let(viewModel::openTab) }
 
-    // Ohne imePadding schiebt sich die Software-Tastatur ueber die Zusatztasten — und
-    // ausgerechnet die braucht man, weil dort Ctrl, Esc und die Pfeile sitzen.
+    val activeTab = tabs.firstOrNull { it.id == activeTabId }
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
             .imePadding(),
     ) {
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            when (state.phase) {
-                TerminalPhase.Connecting, TerminalPhase.Idle -> ConnectingIndicator(state.statusLine)
+        // Die Tab-Leiste liegt bewusst **ueber** dem Terminal statt darueber im Column:
+        // die eingebettete View wird als echte View nach dem Compose-Inhalt gezeichnet
+        // und wuerde eine davor liegende Leiste sonst verdecken. Das Terminal bekommt
+        // dafuer oben denselben Abstand, damit nichts unter der Leiste verschwindet.
+        Box(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .clipToBounds(),
+        ) {
+            when {
+                state.connecting -> ConnectingIndicator(state.statusLine)
 
-                TerminalPhase.Failed -> ConnectionFailed(state.error, onBack)
+                state.error != null && tabs.isEmpty() ->
+                    ConnectionFailed(state.error, onBack, viewModel::dismissError)
 
-                TerminalPhase.Connected, TerminalPhase.Disconnected -> {
-                    AndroidView(
-                        modifier = Modifier.fillMaxSize(),
-                        factory = { viewContext ->
-                            TerminalView(viewContext).also { view ->
-                                terminalView = view
-                                attachBridge(view, viewModel, context)
-                                view.applyTheme(TerminalTheme.Dark)
-                                view.showSoftKeyboard()
-                            }
+                activeTab == null -> NoSessions(onBack)
+
+                else -> {
+                    TerminalSurface(
+                        modifier = Modifier.padding(top = if (tabs.isEmpty()) 0.dp else TAB_STRIP_HEIGHT),
+                        tab = activeTab,
+                        onViewReady = { terminalView = it },
+                        onSelectionChanged = { selectedText = it },
+                        readClipboard = {
+                            context.getSystemService(ClipboardManager::class.java)
+                                ?.primaryClip?.getItemAt(0)?.text?.toString()
+                        },
+                        writeClipboard = { text ->
+                            context.getSystemService(ClipboardManager::class.java)
+                                ?.setPrimaryClip(ClipData.newPlainText("Terminal", text))
                         },
                     )
-                    if (state.phase == TerminalPhase.Disconnected) {
-                        DisconnectedBanner(state.statusLine, onBack)
+
+                    val alive by activeTab.isAlive.collectAsStateWithLifecycle()
+                    if (!alive) {
+                        val reason by activeTab.endedReason.collectAsStateWithLifecycle()
+                        DisconnectedBanner(reason) { viewModel.closeTab(activeTab.id) }
                     }
                 }
             }
+
+            // Auch die Auswahlleiste liegt ueber dem Terminal statt darunter im Column:
+            // wuerde sie Platz wegnehmen, aendert sich die Zeilenzahl, das Terminal
+            // vermisst sich neu — und verwuerfe dabei genau die Auswahl, die sie anzeigt.
+            selectedText?.let { text ->
+                SelectionBar(
+                    modifier = Modifier.align(Alignment.BottomStart),
+                    characters = text.length,
+                    onCopy = {
+                        context.getSystemService(ClipboardManager::class.java)
+                            ?.setPrimaryClip(ClipData.newPlainText("Terminal", text))
+                        terminalView?.clearSelection()
+                    },
+                    onPaste = { terminalView?.sendText(text) },
+                    onDismiss = { terminalView?.clearSelection() },
+                )
+            }
+
+            if (tabs.isNotEmpty()) {
+                TabStrip(
+                    modifier = Modifier.align(Alignment.TopStart),
+                    tabs = tabs,
+                    activeTabId = activeTabId,
+                    onSelect = viewModel::activateTab,
+                    onClose = viewModel::closeTab,
+                    onAdd = onAddSession,
+                )
+            }
         }
 
-        if (state.phase == TerminalPhase.Connected) {
+        if (activeTab != null) {
             ExtraKeysRow(
                 controlActive = controlActive,
                 altActive = altActive,
@@ -111,58 +173,157 @@ fun TerminalScreen(
     }
 
     state.hostKeyRequest?.let { request ->
-        HostKeyDialog(
-            request = request,
-            onAnswer = viewModel::answerHostKey,
-        )
-    }
-
-    DisposableEffect(Unit) {
-        onDispose { terminalView?.detach() }
+        HostKeyDialog(request = request, onAnswer = viewModel::answerHostKey)
     }
 }
 
 /**
- * Haengt die View an die Sitzung.
+ * Bindet die View an den aktiven Tab.
  *
- * Der Bridge wird erst hier erzeugt, weil er die Groesse braucht — und die steht erst
- * fest, wenn die View gemessen wurde. Bis dahin gelten 80×24, was der Server nach dem
- * ersten `updateSize` sofort korrigiert bekommt.
+ * Beim Wechsel wird dieselbe View auf einen anderen [dev.jaui.squeezessh.terminal.TerminalBridge]
+ * umgehaengt. Der Bildschirminhalt kommt aus dessen Emulator und ist deshalb sofort da —
+ * auch das, was ankam, waehrend der Tab im Hintergrund lag.
  */
-private fun attachBridge(view: TerminalView, viewModel: TerminalViewModel, context: Context) {
-    val bridge = viewModel.attachTerminal { session ->
-        TerminalBridge(
-            shell = session.shell,
-            columns = 80,
-            rows = 24,
-            cellWidthPixels = 0,
-            cellHeightPixels = 0,
-            listener = object : TerminalBridge.Listener {
-                override fun onScreenUpdated() = view.onScreenUpdated()
+@Composable
+private fun TerminalSurface(
+    modifier: Modifier = Modifier,
+    tab: TerminalTabs.Tab,
+    onViewReady: (TerminalView) -> Unit,
+    onSelectionChanged: (String?) -> Unit,
+    readClipboard: () -> String?,
+    writeClipboard: (String) -> Unit,
+) {
+    AndroidView(
+        modifier = modifier.fillMaxSize(),
+        factory = { viewContext ->
+            TerminalView(viewContext).also { view ->
+                view.applyTheme(TerminalTheme.Dark)
+                view.onSelectionChanged = onSelectionChanged
+                onViewReady(view)
+            }
+        },
+        update = { view ->
+            if (view.bridge !== tab.bridge) {
+                view.attach(tab.bridge)
+                view.applyTheme(TerminalTheme.Dark)
+                view.showSoftKeyboard()
+            }
+            // Nur der sichtbare Tab zeichnet neu. Die uebrigen sammeln weiter Ausgabe in
+            // ihrem Emulator, ohne die Oberflaeche zu beschaeftigen.
+            tab.onScreenUpdated = view::onScreenUpdated
+            tab.onBell = {
+                view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+            }
+            tab.onClipboardRead = readClipboard
+            tab.onClipboardWrite = writeClipboard
+        },
+    )
 
-                override fun onTitleChanged(title: String?) = Unit
+    DisposableEffect(tab.id) {
+        onDispose {
+            tab.onScreenUpdated = null
+            tab.onBell = null
+            tab.onClipboardRead = null
+            tab.onClipboardWrite = null
+        }
+    }
+}
 
-                override fun onBell() {
-                    view.performHapticFeedback(
-                        android.view.HapticFeedbackConstants.LONG_PRESS,
+@Composable
+private fun TabStrip(
+    modifier: Modifier = Modifier,
+    tabs: List<TerminalTabs.Tab>,
+    activeTabId: Long?,
+    onSelect: (Long) -> Unit,
+    onClose: (Long) -> Unit,
+    onAdd: () -> Unit,
+) {
+    // Bewusst kein Material3-Tab: das bezieht seine Farben aus dem Umfeld einer TabRow und
+    // waere hier, auf schwarzem Terminal-Hintergrund, unsichtbar. Die Leiste bringt ihre
+    // Farben deshalb selbst mit.
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(TAB_STRIP_HEIGHT)
+            .background(TAB_STRIP_BACKGROUND)
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        tabs.forEach { tab ->
+            val title by tab.title.collectAsStateWithLifecycle()
+            val alive by tab.isAlive.collectAsStateWithLifecycle()
+            val active = tab.id == activeTabId
+
+            Row(
+                modifier = Modifier
+                    .background(
+                        color = if (active) TAB_ACTIVE_BACKGROUND else TAB_STRIP_BACKGROUND,
+                        shape = MaterialTheme.shapes.small,
+                    )
+                    .clickable { onSelect(tab.id) }
+                    .padding(start = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = if (alive) title else "$title · beendet",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (active) TAB_ACTIVE_TEXT else TAB_INACTIVE_TEXT,
+                    modifier = Modifier.padding(vertical = 12.dp),
+                )
+                IconButton(onClick = { onClose(tab.id) }, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Sitzung schließen",
+                        tint = if (active) TAB_ACTIVE_TEXT else TAB_INACTIVE_TEXT,
+                        modifier = Modifier.size(16.dp),
                     )
                 }
+            }
+        }
+        IconButton(onClick = onAdd) {
+            Icon(
+                Icons.Default.Add,
+                contentDescription = "Weitere Sitzung",
+                tint = TAB_ACTIVE_TEXT,
+            )
+        }
+    }
+}
 
-                override fun onCopyToClipboard(text: String) {
-                    context.getSystemService(ClipboardManager::class.java)
-                        ?.setPrimaryClip(ClipData.newPlainText("Terminal", text))
-                }
+private val TAB_STRIP_HEIGHT = 44.dp
+private val TAB_STRIP_BACKGROUND = Color(0xFF263238)
+private val TAB_ACTIVE_BACKGROUND = Color(0xFF37474F)
+private val TAB_ACTIVE_TEXT = Color(0xFFFFFFFF)
+private val TAB_INACTIVE_TEXT = Color(0xFFB0BEC5)
 
-                override fun onPasteRequested() {
-                    val clipboard = context.getSystemService(ClipboardManager::class.java)
-                    clipboard?.primaryClip?.getItemAt(0)?.text?.toString()?.let(view::sendText)
-                }
-
-                override fun onFinished(reason: String?) = viewModel.onSessionFinished(reason)
-            },
-        )
-    } ?: return
-    view.attach(bridge)
+@Composable
+private fun SelectionBar(
+    modifier: Modifier = Modifier,
+    characters: Int,
+    onCopy: () -> Unit,
+    onPaste: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text("$characters Zeichen", style = MaterialTheme.typography.labelMedium)
+        TextButton(onClick = onCopy) {
+            Icon(Icons.Default.ContentCopy, contentDescription = null, Modifier.size(16.dp))
+            Text(" Kopieren")
+        }
+        // „Senden" schickt die Auswahl zurueck in die Shell — praktisch, um einen
+        // ausgegebenen Pfad direkt weiterzuverwenden.
+        TextButton(onClick = onPaste) { Text("Senden") }
+        TextButton(onClick = onDismiss) { Text("Abbrechen") }
+    }
 }
 
 @Composable
@@ -185,7 +346,21 @@ private fun ConnectingIndicator(status: String?) {
 }
 
 @Composable
-private fun ConnectionFailed(error: String?, onBack: () -> Unit) {
+private fun NoSessions(onBack: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text("Keine offene Sitzung", color = Color.White)
+        Button(onClick = onBack, modifier = Modifier.padding(top = 16.dp)) {
+            Text("Zu den Verbindungen")
+        }
+    }
+}
+
+@Composable
+private fun ConnectionFailed(error: String?, onBack: () -> Unit, onDismiss: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center,
@@ -196,12 +371,15 @@ private fun ConnectionFailed(error: String?, onBack: () -> Unit) {
             color = Color.White,
             style = MaterialTheme.typography.bodyLarge,
         )
-        Button(onClick = onBack, modifier = Modifier.padding(top = 16.dp)) { Text("Zurück") }
+        Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = onDismiss) { Text("Verstanden") }
+            Button(onClick = onBack) { Text("Zurück") }
+        }
     }
 }
 
 @Composable
-private fun DisconnectedBanner(reason: String?, onBack: () -> Unit) {
+private fun DisconnectedBanner(reason: String?, onClose: () -> Unit) {
     Box(
         modifier = Modifier.fillMaxSize().background(Color(0xAA000000)),
         contentAlignment = Alignment.Center,
@@ -212,7 +390,9 @@ private fun DisconnectedBanner(reason: String?, onBack: () -> Unit) {
                 color = Color.White,
                 style = MaterialTheme.typography.bodyLarge,
             )
-            Button(onClick = onBack, modifier = Modifier.padding(top = 16.dp)) { Text("Zurück") }
+            Button(onClick = onClose, modifier = Modifier.padding(top = 16.dp)) {
+                Text("Tab schließen")
+            }
         }
     }
 }

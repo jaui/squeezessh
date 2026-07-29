@@ -19,7 +19,9 @@ import android.view.inputmethod.InputMethodManager
 import com.termux.terminal.KeyHandler
 import com.termux.terminal.TerminalEmulator
 import com.termux.view.TerminalRenderer
+import kotlin.math.abs
 import kotlin.math.ceil
+import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 /**
@@ -29,7 +31,7 @@ import kotlin.math.roundToInt
  * `TerminalSession`, die einen lokalen Prozess startet. Verwendet werden deshalb die
  * beiden Bausteine, die auch dort die Arbeit machen — [TerminalRenderer] fuers Zeichnen
  * und [KeyHandler] fuer die Umsetzung von Tasten in Escape-Sequenzen. Der Rest, also
- * Groessenrechnung, Gesten und Tastatur-Anbindung, steht hier.
+ * Groessenrechnung, Gesten, Textauswahl und Tastatur-Anbindung, steht hier.
  *
  * Die Geometrie folgt bewusst exakt der von Termux: eine abweichende Zeilenzahl faellt
  * sonst erst auf, wenn `vim` krumm zeichnet.
@@ -45,6 +47,9 @@ class TerminalView @JvmOverloads constructor(
     /** Wird gerufen, wenn der Nutzer scrollt — die Oberflaeche kann dann „springe ans Ende" anbieten. */
     var onScrollPositionChanged: ((atBottom: Boolean) -> Unit)? = null
 
+    /** Meldet den markierten Text, oder `null` wenn nichts markiert ist. */
+    var onSelectionChanged: ((String?) -> Unit)? = null
+
     private var typeface: Typeface = Typeface.MONOSPACE
     private var renderer = TerminalRenderer(DEFAULT_TEXT_SIZE_PX, Typeface.MONOSPACE)
     private var lineSpacingAndAscent = 0
@@ -58,7 +63,20 @@ class TerminalView @JvmOverloads constructor(
     private var pendingControl = false
     private var pendingAlt = false
 
+    /** Zuletzt an den Server gemeldete Groesse, um unnoetige Zuruecksetzungen zu vermeiden. */
+    private var appliedColumns = 0
+    private var appliedRows = 0
+
+    private var selection: TerminalSelection? = null
+    private var draggedHandle: Handle? = null
+
     private val backgroundPaint = Paint().apply { color = Color.BLACK }
+    private val handlePaint = Paint().apply {
+        color = HANDLE_COLOR
+        isAntiAlias = true
+    }
+
+    private enum class Handle { START, END }
 
     init {
         isFocusable = true
@@ -82,6 +100,10 @@ class TerminalView @JvmOverloads constructor(
             override fun onDown(e: MotionEvent) = true
 
             override fun onSingleTapUp(e: MotionEvent): Boolean {
+                if (selection != null) {
+                    clearSelection()
+                    return true
+                }
                 requestFocus()
                 showSoftKeyboard()
                 return true
@@ -100,7 +122,11 @@ class TerminalView @JvmOverloads constructor(
             }
 
             override fun onLongPress(e: MotionEvent) {
-                performLongClick()
+                val emulator = bridge?.emulator ?: return
+                selection = TerminalSelection.wordAt(emulator, columnAt(e.x), rowAt(e.y))
+                notifySelection()
+                invalidate()
+                performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
             }
         },
     )
@@ -108,12 +134,16 @@ class TerminalView @JvmOverloads constructor(
     fun attach(bridge: TerminalBridge) {
         this.bridge = bridge
         topRow = 0
+        clearSelection()
+        appliedColumns = 0
+        appliedRows = 0
         updateSize()
         invalidate()
     }
 
     fun detach() {
         bridge = null
+        clearSelection()
         invalidate()
     }
 
@@ -137,9 +167,7 @@ class TerminalView @JvmOverloads constructor(
     /** Setzt Vordergrund, Hintergrund, Cursor und die 16 Grundfarben. */
     fun applyTheme(theme: TerminalTheme) {
         backgroundPaint.color = theme.background
-        bridge?.emulator?.mColors?.mCurrentColors?.let { palette ->
-            theme.applyTo(palette)
-        }
+        bridge?.emulator?.mColors?.mCurrentColors?.let(theme::applyTo)
         invalidate()
     }
 
@@ -171,23 +199,121 @@ class TerminalView @JvmOverloads constructor(
         val rows = ((height - lineSpacingAndAscent) / renderer.fontLineSpacing)
             .coerceAtLeast(MIN_ROWS)
 
+        // Nur bei echter Aenderung eingreifen. Sonst verwirft jede Neuvermessung — und
+        // davon gibt es viele, etwa wenn eine Leiste ein- oder ausgeblendet wird — die
+        // Auswahl und die Scrollposition, obwohl sich gar nichts verschoben hat.
+        if (columns == appliedColumns && rows == appliedRows) return
+        appliedColumns = columns
+        appliedRows = rows
+
         bridge.resize(columns, rows, renderer.fontWidth.toInt(), renderer.fontLineSpacing)
         topRow = 0
+        clearSelection()
         notifyScrollPosition()
     }
 
     override fun onDraw(canvas: Canvas) {
         val emulator = bridge?.emulator
-        if (emulator == null) {
-            canvas.drawColor(backgroundPaint.color)
-            return
-        }
         canvas.drawColor(backgroundPaint.color)
-        renderer.render(emulator, canvas, topRow, NO_SELECTION, NO_SELECTION, NO_SELECTION, NO_SELECTION)
+        if (emulator == null) return
+
+        val selected = selection?.normalized()
+        renderer.render(
+            emulator,
+            canvas,
+            topRow,
+            selected?.startRow ?: NO_SELECTION,
+            selected?.endRow ?: NO_SELECTION,
+            selected?.startColumn ?: NO_SELECTION,
+            selected?.endColumn ?: NO_SELECTION,
+        )
+        selected?.let { drawHandles(canvas, it) }
+    }
+
+    /**
+     * Zwei Griffe unterhalb der Auswahlenden.
+     *
+     * Bewusst als Teil der View gezeichnet statt als eigene Fenster: Griffe in
+     * PopupWindows muessen bei jedem Scrollen und jeder Groessenaenderung nachgefuehrt
+     * werden und haengen dann sichtbar hinterher.
+     */
+    private fun drawHandles(canvas: Canvas, selection: TerminalSelection) {
+        val startY = (selection.startRow - topRow + 1) * renderer.fontLineSpacing.toFloat()
+        val endY = (selection.endRow - topRow + 1) * renderer.fontLineSpacing.toFloat()
+        canvas.drawCircle(
+            selection.startColumn * renderer.fontWidth,
+            startY + HANDLE_RADIUS_PX,
+            HANDLE_RADIUS_PX,
+            handlePaint,
+        )
+        canvas.drawCircle(
+            (selection.endColumn + 1) * renderer.fontWidth,
+            endY + HANDLE_RADIUS_PX,
+            HANDLE_RADIUS_PX,
+            handlePaint,
+        )
     }
 
     /** Vom Bridge-Listener aufgerufen, wenn neue Ausgabe da ist. */
     fun onScreenUpdated() = invalidate()
+
+    // --- Auswahl ----------------------------------------------------------------------
+
+    fun clearSelection() {
+        if (selection == null) return
+        selection = null
+        draggedHandle = null
+        notifySelection()
+        invalidate()
+    }
+
+    /** Der markierte Text, oder `null`. */
+    fun selectedText(): String? {
+        val emulator = bridge?.emulator ?: return null
+        val selected = selection?.normalized() ?: return null
+        return emulator.screen.getSelectedText(
+            selected.startColumn,
+            selected.startRow,
+            selected.endColumn,
+            selected.endRow,
+        ).takeIf { it.isNotEmpty() }
+    }
+
+    fun selectAllVisible() {
+        val emulator = bridge?.emulator ?: return
+        selection = TerminalSelection(0, topRow, emulator.mColumns - 1, topRow + emulator.mRows - 1)
+        notifySelection()
+        invalidate()
+    }
+
+    private fun notifySelection() = onSelectionChanged?.invoke(selectedText())
+
+    private fun columnAt(x: Float): Int {
+        val columns = bridge?.emulator?.mColumns ?: return 0
+        return (x / renderer.fontWidth).toInt().coerceIn(0, columns - 1)
+    }
+
+    private fun rowAt(y: Float): Int {
+        val rows = bridge?.emulator?.mRows ?: return topRow
+        val onScreen = (y / renderer.fontLineSpacing).toInt().coerceIn(0, rows - 1)
+        return topRow + onScreen
+    }
+
+    private fun handleAt(x: Float, y: Float): Handle? {
+        val selected = selection?.normalized() ?: return null
+        val startX = selected.startColumn * renderer.fontWidth
+        val startY = (selected.startRow - topRow + 1) * renderer.fontLineSpacing + HANDLE_RADIUS_PX
+        val endX = (selected.endColumn + 1) * renderer.fontWidth
+        val endY = (selected.endRow - topRow + 1) * renderer.fontLineSpacing + HANDLE_RADIUS_PX
+
+        val toStart = hypot(x - startX, y - startY)
+        val toEnd = hypot(x - endX, y - endY)
+        return when {
+            toStart > HANDLE_TOUCH_RADIUS_PX && toEnd > HANDLE_TOUCH_RADIUS_PX -> null
+            toStart <= toEnd -> Handle.START
+            else -> Handle.END
+        }
+    }
 
     // --- Scrollen ---------------------------------------------------------------------
 
@@ -195,7 +321,7 @@ class TerminalView @JvmOverloads constructor(
         if (emulator.isAlternateBufferActive) {
             // Im Alternativpuffer (vim, less) gibt es keinen Verlauf — dort erwarten
             // Programme stattdessen Pfeiltasten.
-            repeat(kotlin.math.abs(rowsDown)) {
+            repeat(abs(rowsDown)) {
                 sendKeyCode(if (rowsDown < 0) KeyEvent.KEYCODE_DPAD_UP else KeyEvent.KEYCODE_DPAD_DOWN)
             }
             return
@@ -219,7 +345,39 @@ class TerminalView @JvmOverloads constructor(
     // --- Eingabe ----------------------------------------------------------------------
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        scaleDetector.onTouchEvent(event)
+        // Ein gegriffener Auswahlgriff hat Vorrang: sonst wuerde die Geste als Scrollen
+        // gedeutet und die Auswahl liesse sich nicht anpassen.
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                draggedHandle = handleAt(event.x, event.y)
+                if (draggedHandle != null) return true
+            }
+
+            MotionEvent.ACTION_MOVE -> draggedHandle?.let { handle ->
+                val column = columnAt(event.x)
+                val row = rowAt(event.y)
+                selection = when (handle) {
+                    Handle.START -> selection?.withStart(column, row)
+                    Handle.END -> selection?.withEnd(column, row)
+                }
+                notifySelection()
+                invalidate()
+                return true
+            }
+
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (draggedHandle != null) {
+                draggedHandle = null
+                return true
+            }
+        }
+
+        // Der Skalierer bekommt nur Mehrfinger-Gesten zu sehen. Bei einem einzelnen Finger
+        // wuerde er den Ereignisstrom anfassen, den der Gestenerkenner braucht — und ein
+        // langer Druck kaeme dort nie an.
+        if (event.pointerCount > 1) {
+            scaleDetector.onTouchEvent(event)
+            return true
+        }
         gestureDetector.onTouchEvent(event)
         return true
     }
@@ -263,6 +421,7 @@ class TerminalView @JvmOverloads constructor(
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         val bridge = bridge ?: return super.onKeyDown(keyCode, event)
+        clearSelection()
 
         val control = pendingControl || event.isCtrlPressed
         val alt = pendingAlt || event.isAltPressed
@@ -317,18 +476,15 @@ class TerminalView @JvmOverloads constructor(
                 else -> value
             }
         }
+        if (value < 0) return
 
-        val bytes = if (value >= 0) {
-            String(Character.toChars(value)).toByteArray(Charsets.UTF_8)
-        } else {
-            return
-        }
-
+        val bytes = String(Character.toChars(value)).toByteArray(Charsets.UTF_8)
         bridge.send(if (alt) byteArrayOf(ESCAPE) + bytes else bytes)
         clearStickyModifiers()
     }
 
     fun sendText(text: String) {
+        clearSelection()
         bridge?.send(text)
         clearStickyModifiers()
     }
@@ -367,12 +523,6 @@ class TerminalView @JvmOverloads constructor(
         imm?.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
     }
 
-    /** Sichtbaren Bildschirminhalt als Text — Grundlage fuers Kopieren. */
-    fun visibleText(): String {
-        val emulator = bridge?.emulator ?: return ""
-        return emulator.screen.getSelectedText(0, topRow, emulator.mColumns, topRow + emulator.mRows)
-    }
-
     companion object {
         const val DEFAULT_TEXT_SIZE_PX = 32
         const val MIN_TEXT_SIZE_PX = 12
@@ -381,5 +531,10 @@ class TerminalView @JvmOverloads constructor(
         private const val MIN_ROWS = 4
         private const val NO_SELECTION = -1
         private const val ESCAPE: Byte = 27
+        private const val HANDLE_RADIUS_PX = 22f
+
+        /** Grosszuegiger als der sichtbare Griff — Finger sind ungenau. */
+        private const val HANDLE_TOUCH_RADIUS_PX = 60f
+        private const val HANDLE_COLOR = 0xFF64B5F6.toInt()
     }
 }

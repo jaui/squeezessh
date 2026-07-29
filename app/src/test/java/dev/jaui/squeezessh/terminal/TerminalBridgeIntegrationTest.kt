@@ -157,6 +157,110 @@ class TerminalBridgeIntegrationTest : DatabaseTestCase() {
         }
     }
 
+    // --- Textauswahl ------------------------------------------------------------------
+
+    /** Zeile, in der die Ausgabe steht: der Emulator schreibt sie unter Begruessung und Prompt. */
+    private fun TerminalBridge.rowContaining(marker: String): Int {
+        for (row in 0 until emulator.mRows) {
+            val line = emulator.screen.getSelectedText(0, row, emulator.mColumns - 1, row)
+            if (line.contains(marker)) return row
+        }
+        error("Zeile mit \"$marker\" nicht gefunden")
+    }
+
+    private fun TerminalBridge.columnOf(marker: String, row: Int): Int =
+        emulator.screen.getSelectedText(0, row, emulator.mColumns - 1, row).indexOf(marker)
+
+    @Test
+    fun `Wortauswahl fasst einen Pfad als Ganzes`() = runTest {
+        withBridge { bridge, _ ->
+            bridge.send("echo /etc/ssh/sshd_config ende\n")
+            bridge.awaitScreen("/etc/ssh/sshd_config ende")
+
+            // Zeile der Ausgabe, nicht die des Kommandos.
+            val row = (0 until bridge.emulator.mRows).last { row ->
+                bridge.emulator.screen
+                    .getSelectedText(0, row, bridge.emulator.mColumns - 1, row)
+                    .startsWith("/etc/ssh")
+            }
+            val column = bridge.columnOf("ssh/sshd", row) + 2
+
+            val selection = TerminalSelection.wordAt(bridge.emulator, column, row)
+            val text = bridge.emulator.screen.getSelectedText(
+                selection.startColumn,
+                selection.startRow,
+                selection.endColumn,
+                selection.endRow,
+            )
+
+            // Schraegstriche und Unterstriche sind bewusst keine Wortgrenzen.
+            assertThat(text).isEqualTo("/etc/ssh/sshd_config")
+        }
+    }
+
+    @Test
+    fun `Wortauswahl haelt host colon port zusammen`() = runTest {
+        withBridge { bridge, _ ->
+            bridge.send("echo web.example.com:2222\n")
+            bridge.awaitScreen("web.example.com:2222")
+
+            val row = (0 until bridge.emulator.mRows).last { row ->
+                bridge.emulator.screen
+                    .getSelectedText(0, row, bridge.emulator.mColumns - 1, row)
+                    .startsWith("web.example.com")
+            }
+
+            val selection = TerminalSelection.wordAt(bridge.emulator, 3, row)
+            val text = bridge.emulator.screen.getSelectedText(
+                selection.startColumn,
+                selection.startRow,
+                selection.endColumn,
+                selection.endRow,
+            )
+
+            assertThat(text).isEqualTo("web.example.com:2222")
+        }
+    }
+
+    @Test
+    fun `Auswahl auf leerem Bereich liefert nichts`() = runTest {
+        withBridge { bridge, _ ->
+            bridge.awaitScreen("SqueezeSSH test host")
+
+            // Weit unterhalb der Ausgabe ist der Bildschirm leer.
+            val emptyRow = bridge.emulator.mRows - 1
+            val selection = TerminalSelection.wordAt(bridge.emulator, 10, emptyRow)
+            val text = bridge.emulator.screen.getSelectedText(
+                selection.startColumn,
+                selection.startRow,
+                selection.endColumn,
+                selection.endRow,
+            )
+
+            assertThat(text).isEmpty()
+        }
+    }
+
+    @Test
+    fun `normalized dreht eine rueckwaerts gezogene Auswahl um`() {
+        val backwards = TerminalSelection(startColumn = 20, startRow = 5, endColumn = 3, endRow = 2)
+
+        val normalized = backwards.normalized()
+
+        assertThat(normalized.startRow).isEqualTo(2)
+        assertThat(normalized.startColumn).isEqualTo(3)
+        assertThat(normalized.endRow).isEqualTo(5)
+        assertThat(normalized.endColumn).isEqualTo(20)
+    }
+
+    @Test
+    fun `normalized dreht auch innerhalb einer Zeile um`() {
+        val backwards = TerminalSelection(startColumn = 30, startRow = 4, endColumn = 10, endRow = 4)
+
+        assertThat(backwards.normalized())
+            .isEqualTo(TerminalSelection(10, 4, 30, 4))
+    }
+
     @Test
     fun `Ende der Sitzung wird gemeldet`() = runTest {
         withBridge { bridge, listener ->
