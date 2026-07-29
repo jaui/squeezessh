@@ -2,4 +2,15 @@
 <resources>
     <!-- Compose uebernimmt das eigentliche Theming; das hier ist nur das Start-Theme. -->
     <style name="Theme.SqueezeSsh" parent="android:Theme.Material.NoActionBar" />
+
+    <style name="WidgetRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">#E0E0E0</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:paddingTop">5dp</item>
+        <item name="android:paddingBottom">5dp</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:ellipsize">end</item>
+    </style>
 </resources>

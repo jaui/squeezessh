@@ -44,6 +44,17 @@
             </intent-filter>
         </activity>
 
+        <receiver
+            android:name=".widget.ConnectionsWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_connections_info" />
+        </receiver>
+
         <service
             android:name=".ssh.SshSessionService"
             android:exported="false"

@@ -14,10 +14,13 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -52,11 +55,14 @@ fun AddressBookScreen(
     onOpenIdentities: () -> Unit,
     onOpenImport: () -> Unit,
     onOpenSessions: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenSnippets: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: AddressBookViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    var menuOpen by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<ConnectionEntity?>(null) }
     var dependents by remember { mutableStateOf<List<ConnectionEntity>>(emptyList()) }
 
@@ -66,9 +72,30 @@ fun AddressBookScreen(
             TopAppBar(
                 title = { Text("Verbindungen") },
                 actions = {
+                    // Vier Schaltflaechen nebeneinander draengen den Titel in vier Zeilen.
+                    // Nur „Sitzungen" bleibt sichtbar — das braucht man im Betrieb oft.
                     TextButton(onClick = onOpenSessions) { Text("Sitzungen") }
-                    TextButton(onClick = onOpenIdentities) { Text("Identitäten") }
-                    TextButton(onClick = onOpenImport) { Text("Import") }
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Mehr")
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Identitäten") },
+                            onClick = { menuOpen = false; onOpenIdentities() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Snippets") },
+                            onClick = { menuOpen = false; onOpenSnippets() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Einstellungen") },
+                            onClick = { menuOpen = false; onOpenSettings() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Aus JuiceSSH importieren") },
+                            onClick = { menuOpen = false; onOpenImport() },
+                        )
+                    }
                 },
             )
         },

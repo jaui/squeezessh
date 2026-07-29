@@ -13,7 +13,7 @@ Speicherformat des Originals.
 | M4 | Terminal auf Termux-Emulator | ✅ erledigt |
 | M5 | Address Book UI | ✅ erledigt |
 | M6 | Port-Forwarding und SFTP | ✅ erledigt |
-| M7 | Settings, Snippets, App-Lock, Widget | offen |
+| M7 | Settings, Snippets, App-Lock, Widget | ✅ erledigt |
 | M8 | EC2-Sync | offen |
 | M9 | Plugin-API-Kompatibilität | offen |
 
@@ -56,11 +56,25 @@ auf dem Hauptthread wirft Android dabei mitten im Schreiben, und der Server verw
 `SshSessionManager.close`, `TerminalTabs.close` und den SFTP-Kanal beim Verlassen des
 Browsers.
 
-**Noch nicht umgesetzt aus M4/M5/M6:** umschaltbare Schriftarten in der Oberfläche (Themes und
+**Der PIN wird nicht gespeichert, auch nicht verschlüsselt.** Abgelegt wird ein Nachweis:
+Salz plus PBKDF2 mit 120 000 Runden, zusätzlich mit dem Geräteschlüssel versiegelt. Beim
+Prüfen wird neu abgeleitet und in konstanter Zeit verglichen. Bewusst strenger als bei
+JuiceSSH — dort lag der PIN verschlüsselt vor, aber mit einem Schlüssel aus einer
+Konstanten im Programmcode und dem Kontonamen; wer die Datei hatte, hatte den PIN.
+
+**DataStore kommt als Abhängigkeit, nicht über `Context.preferencesDataStore`.** Das
+Delegat hält eine verborgene, prozessweite Instanz — bequem, aber in Tests nicht
+zurücksetzbar. Zwei Tests fielen darauf herein, bevor die Kopplung aufgelöst war.
+
+**Noch nicht umgesetzt aus M4/M5/M6/M7:** umschaltbare Schriftarten in der Oberfläche (Themes und
 Schnittstelle stehen), Umsortieren von Identitäten pro Verbindung (die Reihenfolge wird
 gespeichert, ist aber noch nicht per Drag änderbar), Export privater Schlüssel,
 Fortschritts-Notification für Übertragungen (Fortschritt, Pause, Fortsetzen und Abbruch
-gibt es im Dateibrowser, aber noch nicht in der Statusleiste).
+gibt es im Dateibrowser, aber noch nicht in der Statusleiste). Aus M7: die
+Terminal-Einstellungen (Farbschema, Schriftgröße, Rand, TERM, Signalton,
+Tastenleisten-Position, Wischverhalten) werden gespeichert, aber vom Terminal noch nicht
+gelesen — es benutzt weiterhin seine Vorgaben. Snippets lassen sich verwalten, aber noch
+nicht aus dem Terminal heraus einfügen.
 
 ## Offene Entscheidungen
 

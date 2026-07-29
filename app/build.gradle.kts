@@ -111,6 +111,8 @@ dependencies {
 
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.work.runtime.ktx)
+    // BiometricPrompt verlangt eine FragmentActivity — deshalb erbt MainActivity davon.
+    implementation(libs.androidx.biometric)
 
     implementation(libs.hilt.android)
     implementation(libs.androidx.hilt.navigation.compose)

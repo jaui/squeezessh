@@ -2,15 +2,19 @@ package dev.jaui.squeezessh.ui
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -18,6 +22,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import dagger.hilt.android.AndroidEntryPoint
+import dev.jaui.squeezessh.data.settings.AppSettings
+import dev.jaui.squeezessh.data.settings.ThemeMode
+import dev.jaui.squeezessh.security.AppLock
+import dev.jaui.squeezessh.security.LockState
 import dev.jaui.squeezessh.ui.addressbook.AddressBookScreen
 import dev.jaui.squeezessh.ui.addressbook.ConnectionEditorScreen
 import dev.jaui.squeezessh.ui.addressbook.ConnectionEditorViewModel
@@ -26,17 +34,66 @@ import dev.jaui.squeezessh.ui.addressbook.IdentityEditorViewModel
 import dev.jaui.squeezessh.ui.addressbook.IdentityListScreen
 import dev.jaui.squeezessh.ui.forward.PortForwardScreen
 import dev.jaui.squeezessh.ui.importer.ImportScreen
+import dev.jaui.squeezessh.ui.lock.LockScreen
+import dev.jaui.squeezessh.ui.settings.SettingsScreen
 import dev.jaui.squeezessh.ui.sftp.SftpBrowserScreen
+import dev.jaui.squeezessh.ui.snippets.SnippetsScreen
 import dev.jaui.squeezessh.ui.terminal.TerminalScreen
 import dev.jaui.squeezessh.ui.theme.SqueezeSshTheme
+import dev.jaui.squeezessh.widget.ConnectionsWidgetProvider
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
+/**
+ * Erbt von [FragmentActivity] und nicht von `ComponentActivity`: `BiometricPrompt` verlangt
+ * eine FragmentActivity, um seinen Dialog einzuhaengen.
+ */
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
+
+    @Inject lateinit var appLock: AppLock
+
+    @Inject lateinit var settings: AppSettings
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { SqueezeSshTheme { SqueezeSshApp(intent) } }
+        lifecycleScope.launch { appLock.initialize() }
+
+        setContent {
+            val themeMode by settings.themeMode.collectAsStateWithLifecycle(ThemeMode.SYSTEM)
+            val lockState by appLock.state.collectAsStateWithLifecycle()
+
+            SqueezeSshTheme(
+                darkTheme = when (themeMode) {
+                    ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                    ThemeMode.LIGHT -> false
+                    ThemeMode.DARK -> true
+                },
+            ) {
+                // Solange nicht entschieden ist, wird nichts gezeigt — sonst blitzt der
+                // Inhalt auf, bevor der Sperrbildschirm darueberlegt.
+                when (lockState) {
+                    LockState.UNKNOWN -> Unit
+                    LockState.LOCKED -> LockScreen()
+                    LockState.UNLOCKED -> SqueezeSshApp(intent)
+                }
+            }
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        appLock.onEnteredBackground()
+        // Beim Verlassen ist der guenstigste Zeitpunkt fuer eine Widget-Auffrischung:
+        // was der Nutzer geaendert hat, ist gespeichert, und er sieht als Naechstes
+        // ohnehin den Startbildschirm.
+        ConnectionsWidgetProvider.requestUpdate(this)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        lifecycleScope.launch { appLock.onEnteredForeground() }
     }
 
     /**
@@ -58,7 +115,16 @@ private fun SqueezeSshApp(intent: Intent?) {
     LaunchedEffect(intent) {
         if (handledIntent.value) return@LaunchedEffect
         handledIntent.value = true
-        intent?.data?.toString()?.let { navController.openQuickConnect(it) }
+
+        // Aus dem Widget kommt eine Verbindungs-ID, von aussen ein ssh://-Link. Die ID
+        // fuehrt direkt ins Terminal, weil die Verbindung vollstaendig hinterlegt ist.
+        val fromWidget = intent
+            ?.getLongExtra(ConnectionsWidgetProvider.EXTRA_CONNECTION_ID, NO_CONNECTION)
+            ?.takeIf { it != NO_CONNECTION }
+        when {
+            fromWidget != null -> navController.openTerminal(fromWidget)
+            else -> intent?.data?.toString()?.let { navController.openQuickConnect(it) }
+        }
     }
 
     NavHost(
@@ -69,15 +135,30 @@ private fun SqueezeSshApp(intent: Intent?) {
         composable(Route.ADDRESS_BOOK) {
             AddressBookScreen(
                 onOpenConnection = { id -> navController.openTerminal(id) },
-                onEditConnection = { id -> navController.navigate("${Route.CONNECTION_EDITOR}?connectionId=$id") },
+                onEditConnection = { id ->
+                    navController.navigate("${Route.CONNECTION_EDITOR}?connectionId=$id")
+                },
                 onNewConnection = { navController.navigate(Route.CONNECTION_EDITOR) },
                 onOpenIdentities = { navController.navigate(Route.IDENTITIES) },
                 onOpenImport = { navController.navigate(Route.IMPORT) },
                 onOpenSessions = { navController.openTerminal(null) },
+                onOpenSettings = { navController.navigate(Route.SETTINGS) },
+                onOpenSnippets = { navController.navigate(Route.SNIPPETS) },
             )
         }
 
         composable(Route.IMPORT) { ImportScreen() }
+
+        composable(Route.SETTINGS) {
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenSnippets = { navController.navigate(Route.SNIPPETS) },
+            )
+        }
+
+        composable(Route.SNIPPETS) {
+            SnippetsScreen(onBack = { navController.popBackStack() })
+        }
 
         composable(Route.SFTP) {
             SftpBrowserScreen(onBack = { navController.popBackStack() })
@@ -177,4 +258,6 @@ private object Route {
     const val TERMINAL = "terminal"
     const val SFTP = "sftp"
     const val FORWARDS = "forwards"
+    const val SETTINGS = "settings"
+    const val SNIPPETS = "snippets"
 }

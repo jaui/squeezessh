@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Feste Zeilenzahl statt einer Liste: ein Widget dieser Groesse zeigt ohnehin nur eine
+  Handvoll Eintraege, und ein RemoteViewsService waere reiner Umweg.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="8dp"
+    android:background="@drawable/widget_background">
+
+    <TextView
+        android:id="@+id/widget_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/app_name"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:paddingBottom="6dp" />
+
+    <TextView
+        android:id="@+id/widget_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/widget_empty"
+        android:textColor="#B0BEC5"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_row_1"
+        style="@style/WidgetRow"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_row_2"
+        style="@style/WidgetRow"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_row_3"
+        style="@style/WidgetRow"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_row_4"
+        style="@style/WidgetRow"
+        android:visibility="gone" />
+
+</LinearLayout>

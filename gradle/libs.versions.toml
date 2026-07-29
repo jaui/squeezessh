@@ -16,6 +16,7 @@ navigationCompose = "2.9.8"
 room = "2.8.4"
 datastore = "1.2.1"
 workManager = "2.11.0"
+biometric = "1.1.0"
 
 # --- DI ---
 hilt = "2.60.1"
@@ -66,6 +67,7 @@ androidx-room-testing = { module = "androidx.room:room-testing", version.ref = "
 
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workManager" }
+androidx-biometric = { module = "androidx.biometric:biometric", version.ref = "biometric" }
 
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hilt" }

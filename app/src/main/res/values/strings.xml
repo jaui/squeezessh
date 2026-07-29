@@ -5,6 +5,9 @@
     <string name="notification_channel_sessions">Offene Sitzungen</string>
     <string name="notification_channel_sessions_description">Hält Verbindungen offen, während die App im Hintergrund ist.</string>
 
+    <string name="widget_description">Häufig genutzte Verbindungen direkt öffnen</string>
+    <string name="widget_empty">Noch keine Verbindungen</string>
+
     <plurals name="sessions_active">
         <item quantity="one">1 Sitzung offen</item>
         <item quantity="other">%d Sitzungen offen</item>
