@@ -28,6 +28,20 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!--
+              ssh://-Links aus Browser, Terminal oder anderen Apps. Die verwandten
+              Schemata sind mit dabei, weil das Datenmodell sie ohnehin kennt.
+            -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="ssh" />
+                <data android:scheme="sftp" />
+                <data android:scheme="mosh" />
+                <data android:scheme="telnet" />
+            </intent-filter>
         </activity>
 
         <service

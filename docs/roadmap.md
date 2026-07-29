@@ -11,7 +11,7 @@ Speicherformat des Originals.
 | M2 | Import bestehender JuiceSSH-Datenbanken | ✅ erledigt |
 | M3 | SSH-Core auf SSHJ inkl. Known Hosts und Jump-Host-Chaining | ✅ erledigt |
 | M4 | Terminal auf Termux-Emulator | ✅ erledigt |
-| M5 | Address Book UI | offen |
+| M5 | Address Book UI | ✅ erledigt |
 | M6 | Port-Forwarding und SFTP | offen |
 | M7 | Settings, Snippets, App-Lock, Widget | offen |
 | M8 | EC2-Sync | offen |
@@ -39,8 +39,14 @@ im selben `Box` wie die eingebettete View. Zwei Gründe, beide praktisch:
 - Nähme eine Leiste Platz weg, änderte sich die Zeilenzahl, das Terminal vermäße sich neu
   — und verwürfe dabei genau die Auswahl, die die Leiste anzeigt.
 
-**Noch nicht umgesetzt aus M4:** umschaltbare Schriftarten in der Oberfläche (die Themes
-und die Schnittstelle dafür stehen).
+**Adresse wird beim Speichern aufgelöst, nicht beim Tippen.** Das Adressfeld nimmt auch
+`ssh://root@host:2222` entgegen. Live zu zerlegen wäre unbrauchbar: bei `10.0.2.2:2222`
+wären Host und Port nach dem ersten Ziffernanschlag getrennt und die restlichen Ziffern
+landeten im falschen Feld. Eine Zeile unter dem Feld zeigt vorher an, was verstanden wurde.
+
+**Noch nicht umgesetzt aus M4/M5:** umschaltbare Schriftarten in der Oberfläche (Themes und
+Schnittstelle stehen), Umsortieren von Identitäten pro Verbindung (die Reihenfolge wird
+gespeichert, ist aber noch nicht per Drag änderbar), Export privater Schlüssel.
 
 ## Offene Entscheidungen
 
