@@ -1,0 +1,34 @@
+# Zwei sshd-Container: ein Ziel und ein vorgelagerter Bastion-Host.
+#
+# Der Bastion erreicht das Ziel unter dem Namen `target`, von aussen ist das Ziel nur
+# ueber 127.0.0.1:2222 zu sehen. Damit laesst sich die Sprung-Kette echt testen und nicht
+# nur simuliert.
+services:
+  target:
+    build: .
+    image: squeezessh-test-sshd
+    container_name: squeezessh-target
+    ports:
+      - "127.0.0.1:2222:22"
+    volumes:
+      - ./keys:/keys:ro
+    networks:
+      - squeezessh
+
+  bastion:
+    # Bewusst ohne `build`: beide Services gleichzeitig dasselbe Image bauen zu lassen
+    # laeuft in einen Konflikt beim Export. Der Bastion nutzt das von `target` gebaute.
+    image: squeezessh-test-sshd
+    depends_on:
+      - target
+    container_name: squeezessh-bastion
+    ports:
+      - "127.0.0.1:2223:22"
+    volumes:
+      - ./keys:/keys:ro
+    networks:
+      - squeezessh
+
+networks:
+  squeezessh:
+    name: squeezessh-test

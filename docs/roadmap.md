@@ -9,7 +9,7 @@ Speicherformat des Originals.
 | M0 | Projekt-Setup, Git-Repo, Referenz-Workspace | ✅ erledigt |
 | M1 | Datenschicht: Room-Entities, Repositories, Keystore-Krypto | ✅ erledigt |
 | M2 | Import bestehender JuiceSSH-Datenbanken | ✅ erledigt |
-| M3 | SSH-Core auf SSHJ inkl. Known Hosts und Jump-Host-Chaining | offen |
+| M3 | SSH-Core auf SSHJ inkl. Known Hosts und Jump-Host-Chaining | ✅ erledigt |
 | M4 | Terminal auf Termux-Emulator | offen |
 | M5 | Address Book UI | offen |
 | M6 | Port-Forwarding und SFTP | offen |
@@ -25,6 +25,19 @@ Speicherformat des Originals.
 - **Mosh.** Erfordert einen eigenen NDK-Build von `mosh-client`. Das Datenmodell führt
   `moshCommand` bereits mit, ausgewertet wird es vorerst nicht.
 - **Lokale Shell.** Termux bringt die Bausteine mit; erst nach M4 sinnvoll zu bewerten.
+
+## Integrationstests
+
+Die SSH-Tests laufen gegen echte sshd-Container aus
+[`tools/test-sshd`](../tools/test-sshd/README.md):
+
+```powershell
+.\tools\test-sshd\up.ps1
+.\gradlew.bat testDebugUnitTest
+```
+
+Ohne laufende Container werden sie übersprungen, nicht rot. Nicht abgedeckt:
+keyboard-interactive (bräuchte PAM, das Alpines OpenSSH nicht mitbringt).
 
 ## Verifikation
 

@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">SqueezeSSH</string>
+
+    <string name="notification_channel_sessions">Offene Sitzungen</string>
+    <string name="notification_channel_sessions_description">Hält Verbindungen offen, während die App im Hintergrund ist.</string>
+
+    <plurals name="sessions_active">
+        <item quantity="one">1 Sitzung offen</item>
+        <item quantity="other">%d Sitzungen offen</item>
+    </plurals>
 </resources>

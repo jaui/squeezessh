@@ -1,0 +1,18 @@
+Port 22
+PermitRootLogin no
+PasswordAuthentication yes
+PubkeyAuthentication yes
+
+# Fuer die Jump-Host-Tests: der Bastion muss Verbindungen weiterreichen duerfen.
+AllowTcpForwarding yes
+GatewayPorts yes
+PermitTunnel yes
+
+Subsystem sftp /usr/lib/ssh/sftp-server
+
+# Kurze Timeouts, damit haengende Tests schnell auffallen statt minutenlang zu blockieren.
+LoginGraceTime 30
+ClientAliveInterval 15
+ClientAliveCountMax 4
+
+LogLevel VERBOSE

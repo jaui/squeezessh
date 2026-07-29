@@ -24,6 +24,12 @@ build/
 *.iws
 .navigation/
 
+# --- Testumgebung ---
+# Die sshd-Testschluessel werden lokal erzeugt (tools\test-sshd\up.ps1). Private
+# Schluessel gehoeren nie ins Repo, auch keine Wegwerf-Schluessel: sonst gewoehnt man
+# sich daran, dass da welche liegen duerfen.
+/tools/test-sshd/keys/
+
 # --- Keystores und Secrets ---
 *.jks
 *.keystore
