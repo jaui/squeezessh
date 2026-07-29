@@ -42,18 +42,72 @@ class SshConnector @Inject constructor(
      * @param onProgress bekommt jeden Schritt gemeldet, damit die Oberflaeche zeigen kann,
      *   an welchem Glied der Kette es gerade haengt.
      */
+    /**
+     * Baut die Kette auf und fragt bei unbekannten Host-Keys nach.
+     *
+     * Die Frage stellt sich **zwischen** zwei Versuchen, nicht waehrend eines: taucht ein
+     * unbekannter Schluessel auf, wird der Aufbau abgebrochen, gefragt, das Ergebnis
+     * gespeichert und neu verbunden. Waehrend jemand einen Fingerprint prueft, laeuft so
+     * kein Protokoll-Timeout mit.
+     *
+     * Jeder Sprung braucht hoechstens eine Entscheidung, deshalb genuegen entsprechend
+     * viele Versuche.
+     */
     suspend fun connect(
         chain: List<SshHop>,
         onHostKey: suspend (HostKeyPrompt) -> Boolean,
         onProgress: (SshConnectionState) -> Unit = {},
-    ): SshConnection = withContext(io) {
+    ): SshConnection {
         require(chain.isNotEmpty()) { "Verbindungskette ist leer" }
 
+        repeat(chain.size + 1) {
+            try {
+                return connectOnce(chain, onProgress)
+            } catch (e: SshException) {
+                val error = e.error
+                if (error !is SshError.HostKeyUnverified) throw e
+
+                if (!onHostKey(error.prompt)) {
+                    throw SshException(
+                        SshError.HostKeyRejected(
+                            "Host-Key von ${error.prompt.host}:${error.prompt.port} " +
+                                "wurde nicht bestaetigt",
+                        ),
+                        e,
+                    )
+                }
+                with(error.prompt) {
+                    knownHosts.trust(host, port, keyType, publicKey, fingerprint)
+                }
+            }
+        }
+        throw SshException(SshError.Unexpected("Host-Key-Pruefung kam zu keinem Ergebnis"))
+    }
+
+    private suspend fun connectOnce(
+        chain: List<SshHop>,
+        onProgress: (SshConnectionState) -> Unit,
+    ): SshConnection = withContext(io) {
         val opened = mutableListOf<SSHClient>()
+        val verifiers = mutableListOf<KnownHostVerifier>()
         try {
             for ((index, hop) in chain.withIndex()) {
                 onProgress(SshConnectionState.Connecting(hop.host))
-                val client = newClient(hop, onHostKey)
+
+                // Bekannte Schluessel vorab laden: der Verifier darf spaeter nicht mehr
+                // auf die Datenbank warten.
+                val verifier = KnownHostVerifier(
+                    known = knownHosts.findFor(hop.host, hop.port),
+                    logicalHost = hop.host,
+                    logicalPort = hop.port,
+                )
+                verifiers += verifier
+
+                val client = SSHClient().apply {
+                    addHostKeyVerifier(verifier)
+                    connectTimeout = CONNECT_TIMEOUT_MILLIS
+                    timeout = READ_TIMEOUT_MILLIS
+                }
 
                 if (index == 0) {
                     client.connect(hop.host, hop.port)
@@ -69,16 +123,14 @@ class SshConnector @Inject constructor(
             SshConnection(clients = opened.toList())
         } catch (e: Throwable) {
             opened.asReversed().forEach { runCatching { it.close() } }
+            // Ein abgelehnter Host-Key sieht in SSHJ wie ein Transportfehler aus. Die
+            // eigentliche Ursache steht im Verifier.
+            verifiers.firstNotNullOfOrNull { it.pendingPrompt }?.let { prompt ->
+                throw SshException(SshError.HostKeyUnverified(prompt), e)
+            }
             throw e.asSshException()
         }
     }
-
-    private fun newClient(hop: SshHop, onHostKey: suspend (HostKeyPrompt) -> Boolean): SSHClient =
-        SSHClient().apply {
-            addHostKeyVerifier(KnownHostVerifier(knownHosts, hop.host, hop.port, onHostKey))
-            connectTimeout = CONNECT_TIMEOUT_MILLIS
-            timeout = READ_TIMEOUT_MILLIS
-        }
 
     /**
      * Probiert die hinterlegten Verfahren der Reihe nach.

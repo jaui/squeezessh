@@ -10,9 +10,15 @@ PermitTunnel yes
 
 Subsystem sftp /usr/lib/ssh/sftp-server
 
-# Kurze Timeouts, damit haengende Tests schnell auffallen statt minutenlang zu blockieren.
-LoginGraceTime 30
-ClientAliveInterval 15
-ClientAliveCountMax 4
+# Grosszuegig genug, dass ein Mensch in Ruhe einen Fingerprint vergleichen kann — sonst
+# stirbt die Verbindung ausgerechnet dann, wenn jemand sorgfaeltig ist.
+LoginGraceTime 120
+ClientAliveInterval 30
+ClientAliveCountMax 6
+
+# OpenSSH 9.8 sperrt nach fehlgeschlagenen oder abgebrochenen Versuchen minutenlang die
+# Quell-IP. In einer Testumgebung heisst das: ein absichtlich fehlerhafter Test macht die
+# darauffolgenden kaputt. Hier deshalb aus.
+PerSourcePenalties no
 
 LogLevel VERBOSE

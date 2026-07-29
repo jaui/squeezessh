@@ -51,27 +51,39 @@ internal class JuiceSshReader private constructor(
         }
     }
 
-    private fun looksLikeJuiceSsh(): Boolean {
-        val required = setOf("connection", "identity", "connectiongroup")
-        val present = mutableSetOf<String>()
-        db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'", null).use { c ->
-            while (c.moveToNext()) present += c.getString(0)
+    /**
+     * Vorhandene Tabellen, einmal eingelesen.
+     *
+     * Nicht jede JuiceSSH-Datenbank hat alle: aeltere Versionen kannten manche Tabellen
+     * noch nicht. Ein fehlendes `snippet` darf den ganzen Import nicht scheitern lassen.
+     */
+    private val tables: Set<String> by lazy {
+        buildSet {
+            db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'", null).use { cursor ->
+                while (cursor.moveToNext()) add(cursor.getString(0))
+            }
         }
-        return present.containsAll(required)
     }
+
+    private fun looksLikeJuiceSsh(): Boolean =
+        tables.containsAll(setOf("connection", "identity", "connectiongroup"))
 
     override fun close() = db.close()
 
-    fun countRows(table: String): Int =
-        db.rawQuery("SELECT COUNT(*) FROM `$table`", null).use { c ->
+    fun countRows(table: String): Int {
+        if (table !in tables) return 0
+        return db.rawQuery("SELECT COUNT(*) FROM `$table`", null).use { c ->
             if (c.moveToFirst()) c.getInt(0) else 0
         }
+    }
 
     fun readGroups(): List<RawGroup> = query(
+        "connectiongroup",
         "SELECT `id`, `name` FROM `connectiongroup`",
     ) { RawGroup(id = it.str("id"), name = it.strOrNull("name")) }
 
     fun readConnections(): List<RawConnection> = query(
+        "connection",
         """
         SELECT `id`, `nickname`, `address`, `port`, `type`, `backspaceMode`,
                `via_id`, `snippet_id`, `mosh_command`
@@ -92,14 +104,17 @@ internal class JuiceSshReader private constructor(
     }
 
     fun readGroupMemberships(): List<RawPair> = query(
+        "connectiongroupmembership",
         "SELECT `group_id`, `connection_id` FROM `connectiongroupmembership`",
     ) { RawPair(first = it.strOrNull("group_id"), second = it.strOrNull("connection_id")) }
 
     fun readConnectionIdentities(): List<RawPair> = query(
+        "connectionidentity",
         "SELECT `connection_id`, `identity_id` FROM `connectionidentity`",
     ) { RawPair(first = it.strOrNull("connection_id"), second = it.strOrNull("identity_id")) }
 
     fun readIdentities(): List<RawIdentity> = query(
+        "identity",
         """
         SELECT `id`, `nickname`, `username`, `password`, `privatekey`,
                `privatekeyPassword`, `passUpdated`, `keyUpdated`, `snippet_id`
@@ -120,6 +135,7 @@ internal class JuiceSshReader private constructor(
     }
 
     fun readSnippets(): List<RawSnippet> = query(
+        "snippet",
         "SELECT `id`, `name`, `content`, `count` FROM `snippet`",
     ) {
         RawSnippet(
@@ -131,6 +147,7 @@ internal class JuiceSshReader private constructor(
     }
 
     fun readPortForwards(): List<RawPortForward> = query(
+        "portforward",
         """
         SELECT `id`, `name`, `mode`, `connection_id`, `host`,
                `localPort`, `remotePort`, `openInBrowser`, `useAsProxy`
@@ -151,6 +168,7 @@ internal class JuiceSshReader private constructor(
     }
 
     fun readKnownHosts(): List<RawKnownHost> = query(
+        "host",
         "SELECT `id`, `hostname`, `fingerprint`, `key`, `type` FROM `host`",
     ) {
         RawKnownHost(
@@ -164,15 +182,18 @@ internal class JuiceSshReader private constructor(
 
     /** Nutzungszaehler, abgelegt als eigene Tabelle statt als Spalte an der Verbindung. */
     fun readConnectionCounters(): Map<String, Int> = buildMap {
-        query("SELECT `connection_id`, `count` FROM `connectioncounter`") {
+        query("connectioncounter", "SELECT `connection_id`, `count` FROM `connectioncounter`") {
             it.strOrNull("connection_id") to (it.intOrNull("count") ?: 0)
         }.forEach { (id, count) -> if (id != null) put(id, count) }
     }
 
-    private fun <T> query(sql: String, map: (Cursor) -> T): List<T> =
-        db.rawQuery(sql, null).use { cursor ->
+    /** Liefert eine leere Liste, wenn es die Tabelle in dieser Datenbank nicht gibt. */
+    private fun <T> query(table: String, sql: String, map: (Cursor) -> T): List<T> {
+        if (table !in tables) return emptyList()
+        return db.rawQuery(sql, null).use { cursor ->
             buildList { while (cursor.moveToNext()) add(map(cursor)) }
         }
+    }
 
     private fun Cursor.str(column: String): String = getString(getColumnIndexOrThrow(column))
 

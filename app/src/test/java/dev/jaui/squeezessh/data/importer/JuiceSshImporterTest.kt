@@ -283,6 +283,35 @@ class JuiceSshImporterTest : DatabaseTestCase() {
         assertThat(report.warnings.any { "Waise" in it }).isTrue()
     }
 
+    /**
+     * Aeltere JuiceSSH-Versionen kannten manche Tabellen noch nicht. Fehlt eine, muss der
+     * Import den Rest trotzdem uebernehmen statt abzubrechen.
+     */
+    @Test
+    fun `Datenbank ohne optionale Tabellen wird trotzdem importiert`() = runTest {
+        val file = temp.newFile("alt.db")
+        JuiceSshFixtures.minimalDatabase(file).use { source ->
+            source.execSQL(
+                "INSERT INTO connection (id, nickname, address, port, type) " +
+                    "VALUES ('c1', 'Alt', 'alt.example.com', 22, 0)",
+            )
+            source.execSQL(
+                "INSERT INTO identity (id, username, nickname) VALUES ('i1', 'root', 'root')",
+            )
+        }
+
+        val preview = importer.preview(JuiceSshBackup(file))
+        assertThat(preview.connections).isEqualTo(1)
+        assertThat(preview.snippets).isEqualTo(0)
+        assertThat(preview.portForwards).isEqualTo(0)
+        assertThat(preview.knownHosts).isEqualTo(0)
+
+        val report = importer.import(JuiceSshBackup(file))
+        assertThat(report.importedConnections).isEqualTo(1)
+        assertThat(report.importedIdentities).isEqualTo(1)
+        assertThat(connections.observeAll().first().single().nickname).isEqualTo("Alt")
+    }
+
     @Test
     fun `Preferences ohne Master-Key gelten als nicht lesbar`() = runTest {
         val file = temp.newFile("leer.db")

@@ -10,12 +10,30 @@ Speicherformat des Originals.
 | M1 | Datenschicht: Room-Entities, Repositories, Keystore-Krypto | ✅ erledigt |
 | M2 | Import bestehender JuiceSSH-Datenbanken | ✅ erledigt |
 | M3 | SSH-Core auf SSHJ inkl. Known Hosts und Jump-Host-Chaining | ✅ erledigt |
-| M4 | Terminal auf Termux-Emulator | offen |
+| M4 | Terminal auf Termux-Emulator | ✅ erledigt |
 | M5 | Address Book UI | offen |
 | M6 | Port-Forwarding und SFTP | offen |
 | M7 | Settings, Snippets, App-Lock, Widget | offen |
 | M8 | EC2-Sync | offen |
 | M9 | Plugin-API-Kompatibilität | offen |
+
+## Abweichungen vom ursprünglichen Plan
+
+**Termux' `TerminalSession` und `TerminalView` sind nicht verwendbar.** `TerminalSession`
+ist `final` und startet in `initializeEmulator` fest einen lokalen Prozess über JNI;
+`TerminalView.attachSession` verlangt genau diesen Typ. Für eine Shell am anderen Ende
+einer SSH-Verbindung ist beides unbrauchbar.
+
+Verwendet werden stattdessen die Bausteine darunter, die für genau diesen Zweck öffentlich
+sind: `TerminalEmulator` als Parser, `TerminalOutput` als Rückkanal, `TerminalRenderer`
+fürs Zeichnen und `KeyHandler` für die Umsetzung von Tasten in Escape-Sequenzen. Eigen
+geschrieben sind nur Größenrechnung, Gesten und Tastatur-Anbindung
+(`terminal/TerminalView.kt`). Die Geometrie folgt bewusst exakt Termux' Rechnung — eine
+abweichende Zeilenzahl fällt sonst erst auf, wenn `vim` krumm zeichnet.
+
+**Noch nicht umgesetzt aus M4:** Textauswahl mit Griffen (nur programmatisches Kopieren),
+mehrere Sitzungen in Tabs, umschaltbare Schriftarten in der Oberfläche (die Themes und die
+Schnittstelle dafür stehen).
 
 ## Offene Entscheidungen
 

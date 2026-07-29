@@ -3,12 +3,14 @@ package dev.jaui.squeezessh.ssh
 import dev.jaui.squeezessh.data.db.entity.ConnectionEntity
 import dev.jaui.squeezessh.data.repository.ConnectionRepository
 import dev.jaui.squeezessh.data.repository.IdentityRepository
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,6 +27,7 @@ class SshSessionManager @Inject constructor(
     private val connector: SshConnector,
     private val connections: ConnectionRepository,
     private val identities: IdentityRepository,
+    private val io: CoroutineDispatcher,
 ) {
 
     private val sessions = MutableStateFlow<Map<Long, SshSession>>(emptyMap())
@@ -55,8 +58,13 @@ class SshSessionManager @Inject constructor(
         val hops = chain.map { it.toHop() }
         val connection = connector.connect(hops, onHostKey, onProgress)
 
+        // Das Oeffnen der Shell schickt Pakete ueber die Leitung und darf deshalb
+        // nicht auf dem Hauptthread laufen: dort wirft Android bei Netzzugriff eine
+        // NetworkOnMainThreadException — mitten im Schreiben eines SSH-Pakets. Der
+        // Server sieht dann ein halbes Paket und wirft die Verbindung als „Bad packet
+        // length" weg.
         val shell = try {
-            SshShell.open(connection, terminalType, columns, rows)
+            withContext(io) { SshShell.open(connection, terminalType, columns, rows) }
         } catch (e: Throwable) {
             connection.close()
             throw SshException(SshError.ConnectionLost("Shell liess sich nicht oeffnen"), e)

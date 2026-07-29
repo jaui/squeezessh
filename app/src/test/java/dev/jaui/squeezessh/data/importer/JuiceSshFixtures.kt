@@ -74,6 +74,25 @@ internal object JuiceSshFixtures {
         return db
     }
 
+    /**
+     * Nur die drei Pflichttabellen — wie eine aeltere JuiceSSH-Version, die `snippet`,
+     * `portforward` und `host` noch nicht kannte.
+     */
+    fun minimalDatabase(target: File): SQLiteDatabase {
+        val db = SQLiteDatabase.openOrCreateDatabase(target, null)
+        listOf(
+            """CREATE TABLE `connectiongroup` (`name` VARCHAR, `id` VARCHAR, PRIMARY KEY (`id`))""",
+            """CREATE TABLE `connection` (`group_id` VARCHAR, `via_id` VARCHAR, `nickname` VARCHAR,
+               `address` VARCHAR, `snippet_id` VARCHAR, `mosh_command` VARCHAR, `port` INTEGER,
+               `type` INTEGER, `backspaceMode` INTEGER, `id` VARCHAR, PRIMARY KEY (`id`))""",
+            """CREATE TABLE `identity` (`username` VARCHAR, `password` VARCHAR,
+               `privatekey` VARCHAR, `privatekeyPassword` VARCHAR, `nickname` VARCHAR,
+               `passUpdated` BIGINT, `keyUpdated` BIGINT, `snippet_id` VARCHAR, `id` VARCHAR,
+               PRIMARY KEY (`id`))""",
+        ).forEach(db::execSQL)
+        return db
+    }
+
     /** Preferences-Datei ohne Master-Key — simuliert ein unvollstaendiges Backup. */
     fun preferencesWithoutMasterKey(target: File, accountHash: String = "abc123"): File {
         target.writeText(

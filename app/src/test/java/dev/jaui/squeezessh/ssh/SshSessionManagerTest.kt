@@ -43,6 +43,7 @@ class SshSessionManagerTest : DatabaseTestCase() {
             connector = SshConnector(KnownHostRepository(db.knownHostDao(), time), Dispatchers.IO),
             connections = connections,
             identities = identities,
+            io = Dispatchers.IO,
         )
     }
 

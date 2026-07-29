@@ -53,6 +53,8 @@ data class HostKeyPrompt(
     val port: Int,
     val keyType: HostKeyType,
     val fingerprint: String,
+    /** Der Schluessel selbst, damit er nach der Zustimmung gespeichert werden kann. */
+    val publicKey: String,
     val previousFingerprint: String? = null,
 ) {
     val isChange: Boolean get() = previousFingerprint != null
@@ -82,6 +84,19 @@ sealed interface SshError {
 
     /** Alle hinterlegten Anmeldeverfahren abgelehnt. */
     data class AuthenticationFailed(override val detail: String?) : SshError
+
+    /**
+     * Der Host-Key ist unbekannt oder hat sich geaendert — der Verbindungsaufbau wurde
+     * deshalb abgebrochen und wartet auf eine Entscheidung.
+     *
+     * Bewusst ein Abbruch und keine Rueckfrage mitten im Handshake: waehrend der Nutzer
+     * einen Fingerprint prueft, laeuft sonst das Transport-Timeout ab und die Verbindung
+     * stirbt genau dann, wenn jemand sorgfaeltig ist.
+     */
+    data class HostKeyUnverified(
+        val prompt: HostKeyPrompt,
+        override val detail: String? = null,
+    ) : SshError
 
     /** Nutzer hat den Host-Key nicht bestaetigt. */
     data class HostKeyRejected(override val detail: String?) : SshError
