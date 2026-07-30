@@ -56,6 +56,45 @@ class SftpSession(private val client: SFTPClient) : AutoCloseable {
     fun sizeOf(path: String): Long = client.stat(path).size
 
     /**
+     * Loescht ueber einen Pfad statt ueber einen [SftpEntry].
+     *
+     * Die Plugin-API kennt nur Pfade; ob dahinter ein Verzeichnis steckt, muss der Aufrufer
+     * wissen — `rm` und `rmdir` sind dort getrennte Aufrufe.
+     */
+    @Throws(IOException::class)
+    fun deletePath(path: String, directory: Boolean) {
+        if (directory) client.rmdir(path) else client.rm(path)
+    }
+
+    /** Ziel eines symbolischen Links, ohne ihm zu folgen. */
+    @Throws(IOException::class)
+    fun readLink(path: String): String = client.readlink(path)
+
+    /** Einzelner Eintrag, wenn nur der Pfad bekannt ist und kein Listing vorliegt. */
+    @Throws(IOException::class)
+    fun statAsEntry(path: String): SftpEntry {
+        val attributes = client.stat(path)
+        return SftpEntry(
+            name = path.substringAfterLast('/'),
+            path = path,
+            isDirectory = attributes.type == FileMode.Type.DIRECTORY,
+            isSymlink = attributes.type == FileMode.Type.SYMLINK,
+            sizeBytes = attributes.size,
+            modifiedEpochSeconds = attributes.mtime,
+            permissions = attributes.mode.toString(),
+        )
+    }
+
+    @Throws(IOException::class)
+    fun chmod(path: String, permissions: Int) = client.chmod(path, permissions)
+
+    @Throws(IOException::class)
+    fun chown(path: String, uid: Int) = client.chown(path, uid)
+
+    @Throws(IOException::class)
+    fun chgrp(path: String, gid: Int) = client.chgrp(path, gid)
+
+    /**
      * Laedt [remotePath] nach [destination].
      *
      * @param startOffset Byte, ab dem gelesen wird — fuer das Fortsetzen einer

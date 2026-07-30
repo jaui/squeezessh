@@ -63,6 +63,9 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        // Seit AGP 8 standardmaessig aus. Die Plugin-API besteht aus AIDL-Schnittstellen,
+        // ohne die es keine Sitzungsuebergabe an Plugins gibt.
+        aidl = true
     }
 
     compileOptions {
@@ -161,6 +164,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.truth)
     testImplementation(libs.robolectric)
+    testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.androidx.room.testing)
     testImplementation(libs.androidx.test.junit)

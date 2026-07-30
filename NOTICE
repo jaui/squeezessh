@@ -1,0 +1,50 @@
+SqueezeSSH
+Copyright 2026 Jan Aui
+
+Dieses Werk steht unter der GNU General Public License v3 (siehe LICENSE).
+Es enthält Bestandteile Dritter unter eigenen Lizenzen:
+
+--------------------------------------------------------------------------------
+JuiceSSH Plugin Library
+--------------------------------------------------------------------------------
+Copyright Sonelli Ltd
+Lizenz: Apache License 2.0
+Quelle: https://github.com/Sonelli/juicessh-pluginlibrary
+
+Unverändert übernommen, damit bestehende JuiceSSH-Plugins ohne Änderung weiter
+funktionieren — die Schnittstellenbeschreibung *ist* das Kompatibilitätsversprechen,
+eine eigene Formulierung wäre eine andere Schnittstelle:
+
+  app/src/main/aidl/com/sonelli/juicessh/pluginlibrary/**
+  app/src/main/java/com/sonelli/juicessh/pluginlibrary/parcelables/**
+
+Der Paketname ist Teil des Vertrags: AIDL benutzt den vollqualifizierten
+Schnittstellennamen als Binder-Descriptor. Ein anderer Paketname wäre eine andere
+Schnittstelle, die kein bestehendes Plugin ansprechen kann.
+
+Nicht übernommen wurde Programmcode der JuiceSSH-App selbst; diese liegt nicht als
+Quelltext vor und diente ausschließlich als Verhaltens- und Schnittstellenreferenz.
+„JuiceSSH" und das zugehörige Logo sind Marken von Sonelli Ltd und werden hier nicht
+verwendet.
+
+--------------------------------------------------------------------------------
+Termux terminal-emulator und terminal-view
+--------------------------------------------------------------------------------
+Copyright Fredrik Fornwall und Mitwirkende
+Lizenz: GNU General Public License v3
+Quelle: https://github.com/termux/termux-app
+
+Diese Abhängigkeit ist der Grund, weshalb SqueezeSSH selbst unter der GPLv3 steht.
+
+--------------------------------------------------------------------------------
+JetBrains Mono
+--------------------------------------------------------------------------------
+Copyright The JetBrains Mono Project Authors
+Lizenz: SIL Open Font License 1.1
+Quelle: https://github.com/JetBrains/JetBrainsMono
+Lizenztext: app/src/main/assets/fonts/JetBrainsMono-OFL.txt
+
+--------------------------------------------------------------------------------
+SSHJ, BouncyCastle, SLF4J, AndroidX, Hilt
+--------------------------------------------------------------------------------
+Lizenz: Apache License 2.0 (BouncyCastle: MIT-artige Lizenz)

@@ -57,6 +57,7 @@ fun AddressBookScreen(
     onOpenSessions: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSnippets: () -> Unit,
+    onOpenPlugins: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: AddressBookViewModel = hiltViewModel(),
 ) {
@@ -90,6 +91,10 @@ fun AddressBookScreen(
                         DropdownMenuItem(
                             text = { Text("Einstellungen") },
                             onClick = { menuOpen = false; onOpenSettings() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Erweiterungen") },
+                            onClick = { menuOpen = false; onOpenPlugins() },
                         )
                         DropdownMenuItem(
                             text = { Text("Aus JuiceSSH importieren") },

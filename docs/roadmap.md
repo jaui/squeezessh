@@ -15,7 +15,7 @@ Speicherformat des Originals.
 | M6 | Port-Forwarding und SFTP | ✅ erledigt |
 | M7 | Settings, Snippets, App-Lock, Widget | ✅ erledigt |
 | M8 | EC2-Sync | zurückgestellt (bleibt im Plan) |
-| M9 | Plugin-API-Kompatibilität | 🚧 ContentProvider steht, AIDL-Dienste und Verwaltung offen |
+| M9 | Plugin-API-Kompatibilität | ✅ erledigt (Gegentest mit echtem Plugin steht aus) |
 
 ## Abweichungen vom ursprünglichen Plan
 
@@ -120,6 +120,30 @@ die Abhängigkeiten und den Namen des Aufrufers. So lässt sich der Vertrag ohne
 ohne Hilt-Aufbau prüfen — die Tests halten Spaltennamen und Zahlwerte als Literale fest,
 damit eine Änderung auffällt, die draußen ein Plugin bricht.
 
+**Ein Einstieg für `ssh://`, nicht zwei.** `MainActivity` und die Activity für den
+Sitzungsaufbau hatten zunächst beide einen Intent-Filter darauf — `cmd package
+query-activities` zeigte prompt beide. Ein Plugin bekäme damit einen Auswahldialog. Jetzt
+ist `MainActivity` der einzige Einstieg: sie prüft das Recht `OPEN_SESSIONS`, reicht an die
+nicht exportierte `PluginConnectActivity` weiter und gibt deren Ergebnis zurück. Der
+Paketname des Plugins wird dabei mitgegeben, weil `callingActivity` sonst auf die eigene App
+zeigte.
+
+**`ssh://` trägt zwei Bedeutungen.** `ssh://root@host:2222` ist ein neues Ziel,
+`ssh://41b4f013-…` ein Verweis auf eine gespeicherte Verbindung. Ohne die Unterscheidung
+landete eine UUID im Schnellzugriff und wurde als Hostname behandelt.
+
+**Sitzungsmerkmale: die Nummer ist öffentlich, der Schlüssel schützt.** Der Vertrag gibt
+`sessionId` (klein, aufsteigend) und `sessionKey` heraus. Der Schlüssel sind 128 zufällige
+Bit, verglichen in konstanter Zeit; zusätzlich kommt nur an eine Sitzung heran, wer sie
+selbst geöffnet hat. Letzteres ist strenger als bei JuiceSSH und kostet nichts.
+
+**Nicht umgesetzt aus dem Vertrag, und warum.** `attach` holte bei JuiceSSH eine
+Hintergrund-Sitzung in den Vordergrund — eine Plugin-Sitzung unter der Hand in die Tabs des
+Nutzers zu schieben wäre eine Überraschung. `get`/`put` im SFTP-Dienst nennen keine
+Gegenseite (`put` ist auch im Original auskommentiert), ohne Ziel ist das nicht erfüllbar.
+`lcd`/`lpwd` setzen ein lokales Arbeitsverzeichnis voraus, das es hier nicht gibt. Alle vier
+melden einen Fehler, statt stillschweigend nichts zu tun.
+
 ## Offene Entscheidungen
 
 - **M9 — eigene vs. JuiceSSH-Authority: entschieden.** Zwei Varianten in der Dimension
@@ -130,12 +154,11 @@ damit eine Änderung auffällt, die draußen ein Plugin bricht.
   `INSTALL_FAILED_DUPLICATE_PERMISSION: … attempting to redeclare permission
   com.sonelli.juicessh.api.v1.permission.OPEN_SFTP_SESSIONS already owned by
   com.sonelli.juicessh`.
-- **M9 noch offen:** die drei AIDL-Dienste (`IPluginService`,
-  `IConnectionPluginService`, `ISftpPluginService`) samt Sitzungsübergabe
-  (`ssh://<uuid>` per `startActivityForResult`, Antwort mit `session_id` und `session_key`)
-  und die Verwaltung in der Oberfläche (Plugin-Liste mit erteilten Rechten,
-  Protokoll-Ansicht). Erst danach ist ein Gegentest mit `juicessh-performancemonitor`
-  möglich.
+- **M9 — offen bleibt der Gegentest.** Umgesetzt sind Provider, AIDL-Dienste,
+  Sitzungsübergabe und Verwaltung. Ob ein bestehendes Plugin damit tatsächlich
+  zurechtkommt, ist noch nicht belegt: dafür braucht es ein echtes Plugin (etwa
+  `juicessh-performancemonitor`) in der Kompatibilitätsvariante, und die lässt sich nicht
+  neben JuiceSSH installieren.
 - **Mosh.** Erfordert einen eigenen NDK-Build von `mosh-client`. Das Datenmodell führt
   `moshCommand` bereits mit, ausgewertet wird es vorerst nicht.
 - **Lokale Shell.** Termux bringt die Bausteine mit; erst nach M4 sinnvoll zu bewerten.

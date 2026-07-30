@@ -134,5 +134,44 @@
                 android:path="/pluginlog"
                 android:readPermission="dev.jaui.squeezessh.api.v1.permission.READ_PLUGIN_LOG" />
         </provider>
+
+        <!--
+          Sitzungsaufbau fuer Plugins. Nicht exportiert: erreichbar nur ueber MainActivity,
+          die als einziger Einstieg fuer `ssh://` dient. Zwei Aktivitaeten mit demselben
+          Intent-Filter fuehren sonst zu einem Auswahldialog beim Plugin.
+        -->
+        <activity
+            android:name="dev.jaui.squeezessh.pluginapi.PluginConnectActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.SqueezeSsh" />
+
+        <service
+            android:name="dev.jaui.squeezessh.pluginapi.PluginService"
+            android:exported="true"
+            android:permission="dev.jaui.squeezessh.api.v1.permission.OPEN_SESSIONS">
+            <intent-filter>
+                <action android:name="dev.jaui.squeezessh.pluginservice" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name="dev.jaui.squeezessh.pluginapi.ConnectionPluginService"
+            android:exported="true"
+            android:permission="dev.jaui.squeezessh.api.v1.permission.OPEN_SESSIONS">
+            <intent-filter>
+                <action android:name="dev.jaui.squeezessh.connectionpluginservice" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name="dev.jaui.squeezessh.pluginapi.SftpPluginService"
+            android:exported="true"
+            android:permission="dev.jaui.squeezessh.api.v1.permission.OPEN_SFTP_SESSIONS">
+            <intent-filter>
+                <action android:name="dev.jaui.squeezessh.sftppluginservice" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

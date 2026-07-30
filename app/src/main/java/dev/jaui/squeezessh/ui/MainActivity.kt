@@ -28,10 +28,18 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
 import dagger.hilt.android.AndroidEntryPoint
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
+import dev.jaui.squeezessh.data.repository.ConnectionRepository
 import dev.jaui.squeezessh.data.settings.AppSettings
 import dev.jaui.squeezessh.data.settings.ThemeMode
 import dev.jaui.squeezessh.security.AppLock
+import dev.jaui.squeezessh.pluginapi.PluginConnectActivity
+import dev.jaui.squeezessh.pluginapi.PluginContract
+import dev.jaui.squeezessh.pluginapi.PluginSessionRequest
 import dev.jaui.squeezessh.security.LockState
 import dev.jaui.squeezessh.ui.addressbook.AddressBookScreen
 import dev.jaui.squeezessh.ui.addressbook.ConnectionEditorScreen
@@ -44,6 +52,7 @@ import dev.jaui.squeezessh.ui.importer.ImportScreen
 import dev.jaui.squeezessh.ui.lock.LockScreen
 import dev.jaui.squeezessh.ui.settings.SettingsScreen
 import dev.jaui.squeezessh.ui.sftp.SftpBrowserScreen
+import dev.jaui.squeezessh.ui.plugins.PluginsScreen
 import dev.jaui.squeezessh.ui.snippets.SnippetsScreen
 import dev.jaui.squeezessh.ui.terminal.TerminalScreen
 import dev.jaui.squeezessh.ui.theme.SqueezeSshTheme
@@ -62,8 +71,19 @@ class MainActivity : FragmentActivity() {
 
     @Inject lateinit var settings: AppSettings
 
+    /**
+     * Reicht das Ergebnis des Sitzungsaufbaus an das Plugin durch, das uns gestartet hat.
+     */
+    private val pluginConnect = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        setResult(result.resultCode, result.data)
+        finish()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (forwardedPluginRequest()) return
         enableEdgeToEdge()
         lifecycleScope.launch { appLock.initialize() }
 
@@ -90,6 +110,40 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * Ein Plugin fordert eine Sitzung an: `ssh://<uuid>` per `startActivityForResult`.
+     *
+     * Diese Activity ist der einzige Einstieg fuer `ssh://` — zwei Aktivitaeten mit
+     * demselben Intent-Filter wuerden dem Plugin einen Auswahldialog zeigen. Der eigentliche
+     * Aufbau laeuft in [PluginConnectActivity]; hier wird nur geprueft, wer fragt.
+     *
+     * Ohne Ergebniserwartung ist es keine Plugin-Anfrage, sondern ein Verweis auf eine
+     * gespeicherte Verbindung — der geht den gewoehnlichen Weg ins Terminal.
+     *
+     * @return true, wenn die Anfrage weitergereicht wurde und hier nichts mehr zu tun ist.
+     */
+    private fun forwardedPluginRequest(): Boolean {
+        val data = intent?.data ?: return false
+        if (!PluginSessionRequest.isPluginRequest(data)) return false
+        val caller = callingActivity?.packageName ?: return false
+
+        if (checkCallingPermission(PluginContract.PERMISSION_OPEN_SESSIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            setResult(RESULT_CANCELED)
+            finish()
+            return true
+        }
+
+        pluginConnect.launch(
+            Intent(this, PluginConnectActivity::class.java)
+                .setData(data)
+                .putExtras(intent.extras ?: Bundle())
+                .putExtra(PluginConnectActivity.EXTRA_CALLER, caller),
+        )
+        return true
     }
 
     override fun onStop() {
@@ -144,10 +198,24 @@ private fun AskForNotificationPermission() {
     }
 }
 
+/** Zugriff auf die Datenschicht aus einem Composable, das kein ViewModel besitzt. */
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface AppEntryPoint {
+    fun connections(): ConnectionRepository
+}
+
 @Composable
 private fun SqueezeSshApp(intent: Intent?) {
     val navController = rememberNavController()
     val handledIntent = remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val connections = remember(context) {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            AppEntryPoint::class.java,
+        ).connections()
+    }
 
     LaunchedEffect(intent) {
         if (handledIntent.value) return@LaunchedEffect
@@ -158,8 +226,15 @@ private fun SqueezeSshApp(intent: Intent?) {
         val fromWidget = intent
             ?.getLongExtra(ConnectionsWidgetProvider.EXTRA_CONNECTION_ID, NO_CONNECTION)
             ?.takeIf { it != NO_CONNECTION }
+        // `ssh://<uuid>` meint eine gespeicherte Verbindung, `ssh://root@host` ein neues
+        // Ziel. Ohne diese Unterscheidung landete eine UUID im Schnellzugriff und wuerde als
+        // Hostname behandelt — der Verbindungsversuch ginge an einen Server dieses Namens.
+        val storedConnection = PluginSessionRequest.publicIdOf(intent?.data)
         when {
             fromWidget != null -> navController.openTerminal(fromWidget)
+            storedConnection != null ->
+                connections.findByPublicId(storedConnection)
+                    ?.let { navController.openTerminal(it.id) }
             else -> intent?.data?.toString()?.let { navController.openQuickConnect(it) }
         }
     }
@@ -181,6 +256,7 @@ private fun SqueezeSshApp(intent: Intent?) {
                 onOpenSessions = { navController.openTerminal(null) },
                 onOpenSettings = { navController.navigate(Route.SETTINGS) },
                 onOpenSnippets = { navController.navigate(Route.SNIPPETS) },
+                onOpenPlugins = { navController.navigate(Route.PLUGINS) },
             )
         }
 
@@ -191,6 +267,10 @@ private fun SqueezeSshApp(intent: Intent?) {
                 onBack = { navController.popBackStack() },
                 onOpenSnippets = { navController.navigate(Route.SNIPPETS) },
             )
+        }
+
+        composable(Route.PLUGINS) {
+            PluginsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Route.SNIPPETS) {
@@ -318,6 +398,7 @@ private object Route {
     const val FORWARDS = "forwards"
     const val SETTINGS = "settings"
     const val SNIPPETS = "snippets"
+    const val PLUGINS = "plugins"
     const val SNIPPET_PICKER = "snippetpicker"
 }
 
