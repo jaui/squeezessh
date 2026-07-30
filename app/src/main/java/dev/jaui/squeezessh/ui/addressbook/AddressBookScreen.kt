@@ -162,9 +162,14 @@ fun AddressBookScreen(
                     }
 
                     if (state.ungrouped.isNotEmpty()) {
-                        if (state.sections.isNotEmpty()) {
-                            item { SectionHeader("Ohne Gruppe") }
+                        // Ohne Ueberschrift liest sich die vollstaendige Liste direkt unter
+                        // „Haeufig genutzt" wie eine Wiederholung derselben Eintraege.
+                        val heading = when {
+                            state.sections.isNotEmpty() -> "Ohne Gruppe"
+                            state.frequentlyUsed.isNotEmpty() -> "Alle Verbindungen"
+                            else -> null
                         }
+                        heading?.let { item { SectionHeader(it) } }
                         items(state.ungrouped, key = { it.id }) { connection ->
                             ConnectionRow(
                                 connection = connection,

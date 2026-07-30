@@ -54,7 +54,14 @@ class AddressBookViewModel @Inject constructor(
                     grouped[group.id]?.takeIf { it.isNotEmpty() }?.let { Section(group, it) }
                 },
             ungrouped = grouped[null].orEmpty(),
-            frequentlyUsed = if (query.isBlank()) frequent else emptyList(),
+            // Die Abkuerzung lohnt nur, wenn sie etwas abkuerzt: enthaelt sie ohnehin jede
+            // Verbindung, steht dieselbe Liste zweimal untereinander und sieht nach einem
+            // Fehler aus. Beim Suchen entfaellt sie ganz — dann zaehlt der Treffer.
+            frequentlyUsed = if (query.isBlank() && frequent.size < visible.size) {
+                frequent
+            } else {
+                emptyList()
+            },
             query = query,
             isEmpty = visible.isEmpty(),
         )
