@@ -37,6 +37,10 @@ class ConnectionRepository @Inject constructor(
 
     suspend fun findById(id: Long): ConnectionEntity? = dao.findById(id)
 
+    /** Nachschlagen ueber die nach aussen sichtbare UUID; so adressiert die Plugin-API. */
+    suspend fun findByPublicId(publicId: String?): ConnectionEntity? =
+        publicId?.let { dao.findByPublicId(it) }
+
     suspend fun create(connection: ConnectionEntity): Long {
         val now = time.nowMillis()
         return dao.insert(connection.copy(createdAt = now, updatedAt = now))
@@ -92,6 +96,10 @@ class ConnectionGroupRepository @Inject constructor(
     fun observeAll(): Flow<List<ConnectionGroupEntity>> = dao.observeAll()
 
     suspend fun findById(id: Long): ConnectionGroupEntity? = dao.findById(id)
+
+    /** Nachschlagen ueber die nach aussen sichtbare UUID; so adressiert die Plugin-API. */
+    suspend fun findByPublicId(publicId: String?): ConnectionGroupEntity? =
+        publicId?.let { dao.findByPublicId(it) }
 
     suspend fun findByName(name: String): ConnectionGroupEntity? = dao.findByName(name)
 
@@ -300,6 +308,10 @@ class PortForwardRepository @Inject constructor(
 
     suspend fun findById(id: Long): PortForwardEntity? = dao.findById(id)
 
+    /** Nachschlagen ueber die nach aussen sichtbare UUID; so adressiert die Plugin-API. */
+    suspend fun findByPublicId(publicId: String?): PortForwardEntity? =
+        publicId?.let { dao.findByPublicId(it) }
+
     suspend fun create(portForward: PortForwardEntity): Long {
         val now = time.nowMillis()
         return dao.insert(portForward.copy(createdAt = now, updatedAt = now))
@@ -322,11 +334,18 @@ class SnippetRepository @Inject constructor(
 
     suspend fun findById(id: Long): SnippetEntity? = dao.findById(id)
 
-    suspend fun create(name: String, content: String): Long {
+    /** Nachschlagen ueber die nach aussen sichtbare UUID; so adressiert die Plugin-API. */
+    suspend fun findByPublicId(publicId: String?): SnippetEntity? =
+        publicId?.let { dao.findByPublicId(it) }
+
+    /**
+     * [publicId] setzt der Import, um die UUID aus JuiceSSH zu uebernehmen — sonst wird eine
+     * neue erzeugt.
+     */
+    suspend fun create(name: String, content: String, publicId: String? = null): Long {
         val now = time.nowMillis()
-        return dao.insert(
-            SnippetEntity(name = name, content = content, createdAt = now, updatedAt = now),
-        )
+        val snippet = SnippetEntity(name = name, content = content, createdAt = now, updatedAt = now)
+        return dao.insert(publicId?.let { snippet.copy(publicId = it) } ?: snippet)
     }
 
     suspend fun update(snippet: SnippetEntity) =

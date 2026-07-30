@@ -1,5 +1,6 @@
 package dev.jaui.squeezessh.data.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -8,6 +9,7 @@ import dev.jaui.squeezessh.data.model.BackspaceMode
 import dev.jaui.squeezessh.data.model.ConnectionType
 import dev.jaui.squeezessh.data.model.HostKeyType
 import dev.jaui.squeezessh.data.model.PortForwardMode
+import java.util.UUID
 
 /**
  * Room-Entities.
@@ -26,10 +28,23 @@ import dev.jaui.squeezessh.data.model.PortForwardMode
 
 @Entity(
     tableName = "connection_group",
-    indices = [Index(value = ["name"], unique = true)],
+    indices = [
+        Index(value = ["name"], unique = true),
+        Index(value = ["publicId"], unique = true),
+    ],
 )
 data class ConnectionGroupEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /**
+     * Stabile Kennung fuer die Plugin-API.
+     *
+     * JuiceSSH adressiert Objekte nach aussen ueber UUIDs (`ssh://41b4f013-…`), nicht ueber
+     * Zahlen. Die Zeilen-ID bleibt intern; nach aussen geht diese UUID, damit ein Plugin
+     * seine Verweise behaelt — auch ueber einen Import aus JuiceSSH hinweg, bei dem die
+     * urspruengliche UUID uebernommen wird.
+     */
+    @ColumnInfo(defaultValue = "''")
+    val publicId: String = UUID.randomUUID().toString(),
     val name: String,
     val sortOrder: Int = 0,
     val createdAt: Long,
@@ -64,10 +79,21 @@ data class ConnectionGroupEntity(
         Index("viaConnectionId"),
         Index("startupSnippetId"),
         Index("nickname"),
+        Index(value = ["publicId"], unique = true),
     ],
 )
 data class ConnectionEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /**
+     * Stabile Kennung fuer die Plugin-API.
+     *
+     * JuiceSSH adressiert Objekte nach aussen ueber UUIDs (`ssh://41b4f013-…`), nicht ueber
+     * Zahlen. Die Zeilen-ID bleibt intern; nach aussen geht diese UUID, damit ein Plugin
+     * seine Verweise behaelt — auch ueber einen Import aus JuiceSSH hinweg, bei dem die
+     * urspruengliche UUID uebernommen wird.
+     */
+    @ColumnInfo(defaultValue = "''")
+    val publicId: String = UUID.randomUUID().toString(),
     val nickname: String?,
     val address: String,
     val port: Int = DEFAULT_SSH_PORT,
@@ -214,10 +240,23 @@ data class KnownHostEntity(
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("connectionId")],
+    indices = [
+        Index("connectionId"),
+        Index(value = ["publicId"], unique = true),
+    ],
 )
 data class PortForwardEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /**
+     * Stabile Kennung fuer die Plugin-API.
+     *
+     * JuiceSSH adressiert Objekte nach aussen ueber UUIDs (`ssh://41b4f013-…`), nicht ueber
+     * Zahlen. Die Zeilen-ID bleibt intern; nach aussen geht diese UUID, damit ein Plugin
+     * seine Verweise behaelt — auch ueber einen Import aus JuiceSSH hinweg, bei dem die
+     * urspruengliche UUID uebernommen wird.
+     */
+    @ColumnInfo(defaultValue = "''")
+    val publicId: String = UUID.randomUUID().toString(),
     val name: String?,
     val connectionId: Long,
     val mode: PortForwardMode,
@@ -234,10 +273,23 @@ data class PortForwardEntity(
 
 @Entity(
     tableName = "snippet",
-    indices = [Index("name")],
+    indices = [
+        Index("name"),
+        Index(value = ["publicId"], unique = true),
+    ],
 )
 data class SnippetEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /**
+     * Stabile Kennung fuer die Plugin-API.
+     *
+     * JuiceSSH adressiert Objekte nach aussen ueber UUIDs (`ssh://41b4f013-…`), nicht ueber
+     * Zahlen. Die Zeilen-ID bleibt intern; nach aussen geht diese UUID, damit ein Plugin
+     * seine Verweise behaelt — auch ueber einen Import aus JuiceSSH hinweg, bei dem die
+     * urspruengliche UUID uebernommen wird.
+     */
+    @ColumnInfo(defaultValue = "''")
+    val publicId: String = UUID.randomUUID().toString(),
     val name: String,
     val content: String,
     val useCount: Int = 0,

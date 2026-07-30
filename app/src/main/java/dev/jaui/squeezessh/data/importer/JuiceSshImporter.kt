@@ -83,7 +83,7 @@ class JuiceSshImporter @Inject constructor(
             for (raw in reader.readSnippets()) {
                 val name = raw.name?.takeIf { it.isNotBlank() } ?: continue
                 val content = raw.content ?: ""
-                snippetIds[raw.id] = snippets.create(name, content)
+                snippetIds[raw.id] = snippets.create(name, content, publicId = raw.id)
                 importedSnippets++
             }
 
@@ -98,7 +98,7 @@ class JuiceSshImporter @Inject constructor(
                     continue
                 }
                 groupIds[raw.id] = groups.create(
-                    ConnectionGroupEntity(name = name, createdAt = 0, updatedAt = 0),
+                    ConnectionGroupEntity(name = name, publicId = raw.id, createdAt = 0, updatedAt = 0),
                 )
                 importedGroups++
             }
@@ -126,6 +126,10 @@ class JuiceSshImporter @Inject constructor(
                 val address = raw.address?.takeIf { it.isNotBlank() } ?: continue
                 connectionIds[raw.id] = connections.create(
                     ConnectionEntity(
+                        // Die UUID aus JuiceSSH wird uebernommen, damit bereits
+                        // installierte Plugins nach dem Import auf dieselben Verbindungen
+                        // zeigen wie vorher.
+                        publicId = raw.id,
                         nickname = raw.nickname,
                         address = address,
                         port = raw.port?.takeIf { it > 0 } ?: ConnectionEntity.DEFAULT_SSH_PORT,
@@ -188,6 +192,7 @@ class JuiceSshImporter @Inject constructor(
                 }
                 portForwards.create(
                     PortForwardEntity(
+                        publicId = raw.id,
                         name = raw.name,
                         connectionId = connectionId,
                         mode = JuiceSshMapping.portForwardMode(raw.mode),

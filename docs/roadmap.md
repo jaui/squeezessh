@@ -15,7 +15,7 @@ Speicherformat des Originals.
 | M6 | Port-Forwarding und SFTP | ✅ erledigt |
 | M7 | Settings, Snippets, App-Lock, Widget | ✅ erledigt |
 | M8 | EC2-Sync | zurückgestellt (bleibt im Plan) |
-| M9 | Plugin-API-Kompatibilität | offen |
+| M9 | Plugin-API-Kompatibilität | 🚧 ContentProvider steht, AIDL-Dienste und Verwaltung offen |
 
 ## Abweichungen vom ursprünglichen Plan
 
@@ -100,11 +100,42 @@ zu laufen.
 privater Schlüssel, Umsortieren von Identitäten, Fortschritts-Notification) sind erledigt
 und auf dem Emulator gegen die Testcontainer geprüft.
 
+**Nach außen UUIDs, innen Zeilen-IDs.** Die Plugin-API adressiert Objekte über UUIDs
+(`ssh://41b4f013-…`, `IPluginService.connect(String id)`) — das ist keine Vorsichtsmaßnahme,
+sondern der veröffentlichte Vertrag. `connection`, `connection_group`, `port_forward` und
+`snippet` haben deshalb eine `publicId`; Schema 1 → 2 füllt sie für bestehende Zeilen. Der
+Import übernimmt die UUID aus JuiceSSH, damit ein bereits installiertes Plugin nach dem
+Import auf dieselben Verbindungen zeigt wie vorher.
+
+**Die Plugin-API kann schreiben, aber nicht heimlich.** Ein Plugin mit `WRITE_CONNECTIONS`
+könnte eine Adresse ändern und damit Anmeldungen auf einen fremden Server lenken. Ein
+deklariertes Recht stillschweigend zu verweigern wäre schlechter — dann glaubt das Plugin,
+es habe es. Stattdessen hängt jeder Pfad an einer eigenen `dangerous`-Permission, und jeder
+Zugriff landet mit Paketnamen im Prüfpfad (`plugin_log`), abgewiesene Versuche eingeschlossen.
+Identitäten und Known Hosts stehen gar nicht in der API; dort liegen die Geheimnisse. Das
+Lesen des Prüfpfads wird nicht protokolliert, sonst wächst er beim Hinsehen.
+
+**Die Abbildung liegt in `PluginApiGateway`, nicht im Provider.** Der Provider beschafft nur
+die Abhängigkeiten und den Namen des Aufrufers. So lässt sich der Vertrag ohne Binder und
+ohne Hilt-Aufbau prüfen — die Tests halten Spaltennamen und Zahlwerte als Literale fest,
+damit eine Änderung auffällt, die draußen ein Plugin bricht.
+
 ## Offene Entscheidungen
 
-- **M9 — eigene vs. JuiceSSH-Authority.** Die Übernahme von Authority und
-  Permission-Namen macht eine Koexistenz mit installiertem JuiceSSH unmöglich.
-  Vorschlag: eigene Authority als Standard, Kompatibilität als Build-Flavor.
+- **M9 — eigene vs. JuiceSSH-Authority: entschieden.** Zwei Varianten in der Dimension
+  `pluginApi`. `standalone` (Standard) benutzt `dev.jaui.squeezessh.api.v1`,
+  `juicesshcompat` die Namen von JuiceSSH, damit bestehende Plugins die API ohne Änderung
+  finden. Der Konflikt ist auf dem Emulator belegt: die Kompatibilitätsvariante lässt sich
+  neben installiertem JuiceSSH nicht installieren —
+  `INSTALL_FAILED_DUPLICATE_PERMISSION: … attempting to redeclare permission
+  com.sonelli.juicessh.api.v1.permission.OPEN_SFTP_SESSIONS already owned by
+  com.sonelli.juicessh`.
+- **M9 noch offen:** die drei AIDL-Dienste (`IPluginService`,
+  `IConnectionPluginService`, `ISftpPluginService`) samt Sitzungsübergabe
+  (`ssh://<uuid>` per `startActivityForResult`, Antwort mit `session_id` und `session_key`)
+  und die Verwaltung in der Oberfläche (Plugin-Liste mit erteilten Rechten,
+  Protokoll-Ansicht). Erst danach ist ein Gegentest mit `juicessh-performancemonitor`
+  möglich.
 - **Mosh.** Erfordert einen eigenen NDK-Build von `mosh-client`. Das Datenmodell führt
   `moshCommand` bereits mit, ausgewertet wird es vorerst nicht.
 - **Lokale Shell.** Termux bringt die Bausteine mit; erst nach M4 sinnvoll zu bewerten.

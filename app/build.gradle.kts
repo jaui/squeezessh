@@ -19,6 +19,35 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Die Plugin-API von JuiceSSH laesst sich nicht mit ihren Originalnamen anbieten und
+    // gleichzeitig neben JuiceSSH installieren: gleiche Provider-Authority und gleiche
+    // Permission-Namen fuehren zu INSTALL_FAILED_CONFLICTING_PROVIDER bzw.
+    // DUPLICATE_PERMISSION. Deshalb zwei Varianten, die sich nur darin unterscheiden.
+    flavorDimensions += "pluginApi"
+
+    productFlavors {
+        create("standalone") {
+            dimension = "pluginApi"
+            isDefault = true
+            manifestPlaceholders["pluginApiAuthority"] = "dev.jaui.squeezessh.api.v1"
+            buildConfigField(
+                "String",
+                "PLUGIN_API_AUTHORITY",
+                "\"dev.jaui.squeezessh.api.v1\"",
+            )
+        }
+        create("juicesshcompat") {
+            dimension = "pluginApi"
+            versionNameSuffix = "-juicesshcompat"
+            manifestPlaceholders["pluginApiAuthority"] = "com.sonelli.juicessh.api.v1"
+            buildConfigField(
+                "String",
+                "PLUGIN_API_AUTHORITY",
+                "\"com.sonelli.juicessh.api.v1\"",
+            )
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"

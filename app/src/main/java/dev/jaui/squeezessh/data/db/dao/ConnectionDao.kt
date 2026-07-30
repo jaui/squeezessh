@@ -20,6 +20,10 @@ interface ConnectionDao {
     @Query("SELECT * FROM connection ORDER BY COALESCE(NULLIF(nickname, ''), address) COLLATE NOCASE")
     fun observeAll(): Flow<List<ConnectionEntity>>
 
+    /** Nachschlagen ueber die nach aussen sichtbare UUID — so adressiert die Plugin-API. */
+    @Query("SELECT * FROM connection WHERE publicId = :publicId LIMIT 1")
+    suspend fun findByPublicId(publicId: String): ConnectionEntity?
+
     @Query("SELECT * FROM connection WHERE groupId = :groupId ORDER BY COALESCE(NULLIF(nickname, ''), address) COLLATE NOCASE")
     fun observeByGroup(groupId: Long): Flow<List<ConnectionEntity>>
 

@@ -1,0 +1,815 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "5157f5c22f091488c3abe0696e57f77c",
+    "entities": [
+      {
+        "tableName": "connection",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `publicId` TEXT NOT NULL DEFAULT '', `nickname` TEXT, `address` TEXT NOT NULL, `port` INTEGER NOT NULL, `type` TEXT NOT NULL, `groupId` INTEGER, `viaConnectionId` INTEGER, `startupSnippetId` INTEGER, `backspaceMode` TEXT NOT NULL, `moshCommand` TEXT, `useCount` INTEGER NOT NULL, `lastUsedAt` INTEGER, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, FOREIGN KEY(`groupId`) REFERENCES `connection_group`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL , FOREIGN KEY(`viaConnectionId`) REFERENCES `connection`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL , FOREIGN KEY(`startupSnippetId`) REFERENCES `snippet`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "publicId",
+            "columnName": "publicId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "nickname",
+            "columnName": "nickname",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "address",
+            "columnName": "address",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "port",
+            "columnName": "port",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "groupId",
+            "columnName": "groupId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "viaConnectionId",
+            "columnName": "viaConnectionId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "startupSnippetId",
+            "columnName": "startupSnippetId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "backspaceMode",
+            "columnName": "backspaceMode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "moshCommand",
+            "columnName": "moshCommand",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "useCount",
+            "columnName": "useCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastUsedAt",
+            "columnName": "lastUsedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_connection_groupId",
+            "unique": false,
+            "columnNames": [
+              "groupId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_connection_groupId` ON `${TABLE_NAME}` (`groupId`)"
+          },
+          {
+            "name": "index_connection_viaConnectionId",
+            "unique": false,
+            "columnNames": [
+              "viaConnectionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_connection_viaConnectionId` ON `${TABLE_NAME}` (`viaConnectionId`)"
+          },
+          {
+            "name": "index_connection_startupSnippetId",
+            "unique": false,
+            "columnNames": [
+              "startupSnippetId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_connection_startupSnippetId` ON `${TABLE_NAME}` (`startupSnippetId`)"
+          },
+          {
+            "name": "index_connection_nickname",
+            "unique": false,
+            "columnNames": [
+              "nickname"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_connection_nickname` ON `${TABLE_NAME}` (`nickname`)"
+          },
+          {
+            "name": "index_connection_publicId",
+            "unique": true,
+            "columnNames": [
+              "publicId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_connection_publicId` ON `${TABLE_NAME}` (`publicId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "connection_group",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "groupId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "connection",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "viaConnectionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "snippet",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "startupSnippetId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "connection_group",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `publicId` TEXT NOT NULL DEFAULT '', `name` TEXT NOT NULL, `sortOrder` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "publicId",
+            "columnName": "publicId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_connection_group_name",
+            "unique": true,
+            "columnNames": [
+              "name"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_connection_group_name` ON `${TABLE_NAME}` (`name`)"
+          },
+          {
+            "name": "index_connection_group_publicId",
+            "unique": true,
+            "columnNames": [
+              "publicId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_connection_group_publicId` ON `${TABLE_NAME}` (`publicId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "connection_group_membership",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`connectionId` INTEGER NOT NULL, `groupId` INTEGER NOT NULL, PRIMARY KEY(`connectionId`, `groupId`), FOREIGN KEY(`connectionId`) REFERENCES `connection`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`groupId`) REFERENCES `connection_group`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "connectionId",
+            "columnName": "connectionId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "groupId",
+            "columnName": "groupId",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "connectionId",
+            "groupId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_connection_group_membership_groupId",
+            "unique": false,
+            "columnNames": [
+              "groupId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_connection_group_membership_groupId` ON `${TABLE_NAME}` (`groupId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "connection",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "connectionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "connection_group",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "groupId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "identity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `nickname` TEXT, `username` TEXT NOT NULL, `passwordCipher` TEXT, `privateKeyCipher` TEXT, `privateKeyPasswordCipher` TEXT, `publicKey` TEXT, `startupSnippetId` INTEGER, `passwordUpdatedAt` INTEGER, `keyUpdatedAt` INTEGER, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, FOREIGN KEY(`startupSnippetId`) REFERENCES `snippet`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nickname",
+            "columnName": "nickname",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "username",
+            "columnName": "username",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "passwordCipher",
+            "columnName": "passwordCipher",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "privateKeyCipher",
+            "columnName": "privateKeyCipher",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "privateKeyPasswordCipher",
+            "columnName": "privateKeyPasswordCipher",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "publicKey",
+            "columnName": "publicKey",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "startupSnippetId",
+            "columnName": "startupSnippetId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "passwordUpdatedAt",
+            "columnName": "passwordUpdatedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "keyUpdatedAt",
+            "columnName": "keyUpdatedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_identity_startupSnippetId",
+            "unique": false,
+            "columnNames": [
+              "startupSnippetId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_identity_startupSnippetId` ON `${TABLE_NAME}` (`startupSnippetId`)"
+          },
+          {
+            "name": "index_identity_nickname",
+            "unique": false,
+            "columnNames": [
+              "nickname"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_identity_nickname` ON `${TABLE_NAME}` (`nickname`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "snippet",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "startupSnippetId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "connection_identity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`connectionId` INTEGER NOT NULL, `identityId` INTEGER NOT NULL, `sortOrder` INTEGER NOT NULL, PRIMARY KEY(`connectionId`, `identityId`), FOREIGN KEY(`connectionId`) REFERENCES `connection`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`identityId`) REFERENCES `identity`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "connectionId",
+            "columnName": "connectionId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "identityId",
+            "columnName": "identityId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "connectionId",
+            "identityId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_connection_identity_identityId",
+            "unique": false,
+            "columnNames": [
+              "identityId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_connection_identity_identityId` ON `${TABLE_NAME}` (`identityId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "connection",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "connectionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "identity",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "identityId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "known_host",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `hostname` TEXT NOT NULL, `port` INTEGER NOT NULL, `keyType` TEXT NOT NULL, `publicKey` TEXT NOT NULL, `fingerprint` TEXT NOT NULL, `firstSeenAt` INTEGER NOT NULL, `lastSeenAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hostname",
+            "columnName": "hostname",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "port",
+            "columnName": "port",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "keyType",
+            "columnName": "keyType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "publicKey",
+            "columnName": "publicKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fingerprint",
+            "columnName": "fingerprint",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "firstSeenAt",
+            "columnName": "firstSeenAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSeenAt",
+            "columnName": "lastSeenAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_known_host_hostname_port_keyType",
+            "unique": true,
+            "columnNames": [
+              "hostname",
+              "port",
+              "keyType"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_known_host_hostname_port_keyType` ON `${TABLE_NAME}` (`hostname`, `port`, `keyType`)"
+          }
+        ]
+      },
+      {
+        "tableName": "port_forward",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `publicId` TEXT NOT NULL DEFAULT '', `name` TEXT, `connectionId` INTEGER NOT NULL, `mode` TEXT NOT NULL, `localPort` INTEGER NOT NULL, `targetHost` TEXT, `remotePort` INTEGER, `openInBrowser` INTEGER NOT NULL, `useAsProxy` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, FOREIGN KEY(`connectionId`) REFERENCES `connection`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "publicId",
+            "columnName": "publicId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "connectionId",
+            "columnName": "connectionId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mode",
+            "columnName": "mode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localPort",
+            "columnName": "localPort",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetHost",
+            "columnName": "targetHost",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "remotePort",
+            "columnName": "remotePort",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "openInBrowser",
+            "columnName": "openInBrowser",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "useAsProxy",
+            "columnName": "useAsProxy",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_port_forward_connectionId",
+            "unique": false,
+            "columnNames": [
+              "connectionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_port_forward_connectionId` ON `${TABLE_NAME}` (`connectionId`)"
+          },
+          {
+            "name": "index_port_forward_publicId",
+            "unique": true,
+            "columnNames": [
+              "publicId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_port_forward_publicId` ON `${TABLE_NAME}` (`publicId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "connection",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "connectionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "snippet",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `publicId` TEXT NOT NULL DEFAULT '', `name` TEXT NOT NULL, `content` TEXT NOT NULL, `useCount` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "publicId",
+            "columnName": "publicId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "content",
+            "columnName": "content",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "useCount",
+            "columnName": "useCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_snippet_name",
+            "unique": false,
+            "columnNames": [
+              "name"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_snippet_name` ON `${TABLE_NAME}` (`name`)"
+          },
+          {
+            "name": "index_snippet_publicId",
+            "unique": true,
+            "columnNames": [
+              "publicId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_snippet_publicId` ON `${TABLE_NAME}` (`publicId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "plugin_log",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `message` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "packageName",
+            "columnName": "packageName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "message",
+            "columnName": "message",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_plugin_log_packageName",
+            "unique": false,
+            "columnNames": [
+              "packageName"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_plugin_log_packageName` ON `${TABLE_NAME}` (`packageName`)"
+          },
+          {
+            "name": "index_plugin_log_createdAt",
+            "unique": false,
+            "columnNames": [
+              "createdAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_plugin_log_createdAt` ON `${TABLE_NAME}` (`createdAt`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '5157f5c22f091488c3abe0696e57f77c')"
+    ]
+  }
+}

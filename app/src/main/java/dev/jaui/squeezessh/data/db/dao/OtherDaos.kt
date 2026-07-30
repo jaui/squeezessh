@@ -9,6 +9,7 @@ import androidx.room.Update
 import dev.jaui.squeezessh.data.db.entity.ConnectionGroupEntity
 import dev.jaui.squeezessh.data.db.entity.IdentityEntity
 import dev.jaui.squeezessh.data.db.entity.KnownHostEntity
+import dev.jaui.squeezessh.data.db.entity.PluginLogEntity
 import dev.jaui.squeezessh.data.db.entity.PortForwardEntity
 import dev.jaui.squeezessh.data.db.entity.SnippetEntity
 import dev.jaui.squeezessh.data.model.HostKeyType
@@ -16,6 +17,11 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ConnectionGroupDao {
+
+    /** Nachschlagen ueber die nach aussen sichtbare UUID — so adressiert die Plugin-API. */
+    @Query("SELECT * FROM connection_group WHERE publicId = :publicId LIMIT 1")
+    suspend fun findByPublicId(publicId: String): ConnectionGroupEntity?
+
 
     @Query("SELECT * FROM connection_group ORDER BY sortOrder, name COLLATE NOCASE")
     fun observeAll(): Flow<List<ConnectionGroupEntity>>
@@ -96,6 +102,11 @@ interface KnownHostDao {
 @Dao
 interface PortForwardDao {
 
+    /** Nachschlagen ueber die nach aussen sichtbare UUID — so adressiert die Plugin-API. */
+    @Query("SELECT * FROM port_forward WHERE publicId = :publicId LIMIT 1")
+    suspend fun findByPublicId(publicId: String): PortForwardEntity?
+
+
     @Query("SELECT * FROM port_forward ORDER BY localPort")
     fun observeAll(): Flow<List<PortForwardEntity>>
 
@@ -121,6 +132,11 @@ interface PortForwardDao {
 @Dao
 interface SnippetDao {
 
+    /** Nachschlagen ueber die nach aussen sichtbare UUID — so adressiert die Plugin-API. */
+    @Query("SELECT * FROM snippet WHERE publicId = :publicId LIMIT 1")
+    suspend fun findByPublicId(publicId: String): SnippetEntity?
+
+
     @Query("SELECT * FROM snippet ORDER BY name COLLATE NOCASE")
     fun observeAll(): Flow<List<SnippetEntity>>
 
@@ -141,4 +157,28 @@ interface SnippetDao {
 
     @Query("UPDATE snippet SET useCount = useCount + 1 WHERE id = :id")
     suspend fun recordUse(id: Long)
+}
+
+@Dao
+interface PluginLogDao {
+
+    @Query("SELECT * FROM plugin_log ORDER BY createdAt DESC LIMIT :limit")
+    fun observeRecent(limit: Int = 200): Flow<List<PluginLogEntity>>
+
+    /** Alle je gesehenen Plugin-Pakete, jüngste Aktivität zuerst. */
+    @Query("SELECT packageName FROM plugin_log GROUP BY packageName ORDER BY MAX(createdAt) DESC")
+    fun observePackages(): Flow<List<String>>
+
+    @Insert
+    suspend fun insert(entry: PluginLogEntity): Long
+
+    @Query("DELETE FROM plugin_log")
+    suspend fun deleteAll()
+
+    /**
+     * Der Prüfpfad darf nicht unbegrenzt wachsen. Gelöscht wird nach Alter, nicht nach
+     * Anzahl — was ein Plugin heute tut, ist die interessante Information.
+     */
+    @Query("DELETE FROM plugin_log WHERE createdAt < :before")
+    suspend fun deleteOlderThan(before: Long)
 }

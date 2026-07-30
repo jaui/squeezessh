@@ -7,6 +7,7 @@ import dev.jaui.squeezessh.data.db.dao.ConnectionDao
 import dev.jaui.squeezessh.data.db.dao.ConnectionGroupDao
 import dev.jaui.squeezessh.data.db.dao.IdentityDao
 import dev.jaui.squeezessh.data.db.dao.KnownHostDao
+import dev.jaui.squeezessh.data.db.dao.PluginLogDao
 import dev.jaui.squeezessh.data.db.dao.PortForwardDao
 import dev.jaui.squeezessh.data.db.dao.SnippetDao
 import dev.jaui.squeezessh.data.db.entity.ConnectionEntity
@@ -15,6 +16,7 @@ import dev.jaui.squeezessh.data.db.entity.ConnectionGroupMembershipEntity
 import dev.jaui.squeezessh.data.db.entity.ConnectionIdentityEntity
 import dev.jaui.squeezessh.data.db.entity.IdentityEntity
 import dev.jaui.squeezessh.data.db.entity.KnownHostEntity
+import dev.jaui.squeezessh.data.db.entity.PluginLogEntity
 import dev.jaui.squeezessh.data.db.entity.PortForwardEntity
 import dev.jaui.squeezessh.data.db.entity.SnippetEntity
 
@@ -28,8 +30,9 @@ import dev.jaui.squeezessh.data.db.entity.SnippetEntity
         KnownHostEntity::class,
         PortForwardEntity::class,
         SnippetEntity::class,
+        PluginLogEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -41,6 +44,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun knownHostDao(): KnownHostDao
     abstract fun portForwardDao(): PortForwardDao
     abstract fun snippetDao(): SnippetDao
+    abstract fun pluginLogDao(): PluginLogDao
 
     companion object {
         const val NAME = "squeezessh.db"

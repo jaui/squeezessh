@@ -123,11 +123,23 @@ Die AIDL-Definitionen sind **nicht** aus dem Dekompilat zu nehmen, sondern aus
 [`Sonelli/juicessh-pluginlibrary`](https://github.com/Sonelli/juicessh-pluginlibrary)
 (Apache-2.0, von Sonelli selbst veröffentlicht).
 
-> **Installationskonflikt:** Wer Authority und Permission-Namen von JuiceSSH übernimmt,
-> kann nicht neben einem installierten JuiceSSH koexistieren
-> (`INSTALL_FAILED_CONFLICTING_PROVIDER` bzw. `DUPLICATE_PERMISSION`).
-> Vorgesehen ist daher eine eigene Authority als Standard und ein separater
-> Build-Flavor für JuiceSSH-Kompatibilität.
+> **Installationskonflikt — auf dem Emulator belegt:** Wer Authority und Permission-Namen
+> von JuiceSSH übernimmt, kann nicht neben einem installierten JuiceSSH koexistieren.
+> Der Versuch endet mit
+> `INSTALL_FAILED_DUPLICATE_PERMISSION: Package dev.jaui.squeezessh.debug attempting to
+> redeclare permission com.sonelli.juicessh.api.v1.permission.OPEN_SFTP_SESSIONS already
+> owned by com.sonelli.juicessh`. Umgesetzt ist daher eine eigene Authority als Standard
+> (`standalone`) und ein separater Build-Flavor `juicesshcompat`.
+
+Nach außen adressiert die API **UUIDs**, nicht Zeilen-IDs: `connection.id` ist in JuiceSSHs
+Datenbank ein UUID-String (`41b4f013-ca39-49b9-8837-3ee5864b5498`), und derselbe Wert steht
+in `ssh://<id>` sowie in `IPluginService.connect(String id)`.
+
+**Sitzungsübergabe** (aus `ConnectionPluginClient`): das Plugin ruft zuerst
+`service.connect(id)` — nur fürs Protokoll —, dann
+`startActivityForResult(ACTION_VIEW, ssh://<uuid>)` mit dem Extra `background=true`
+(`sftp=true` beim SFTP-Client). Die Antwort trägt `session_id` (int) und `session_key`
+(String); alle weiteren AIDL-Aufrufe erwarten dieses Paar.
 
 ## Funktionsumfang (aus Activities und Layouts abgeleitet)
 

@@ -12,11 +12,13 @@ import dagger.hilt.components.SingletonComponent
 import dev.jaui.squeezessh.data.crypto.AndroidKeystoreSecretVault
 import dev.jaui.squeezessh.data.crypto.SecretVault
 import dev.jaui.squeezessh.data.db.AppDatabase
+import dev.jaui.squeezessh.data.db.MIGRATION_1_2
 import dev.jaui.squeezessh.data.db.dao.ConnectionDao
 import dev.jaui.squeezessh.data.db.dao.ConnectionGroupDao
 import dev.jaui.squeezessh.data.db.dao.IdentityDao
 import dev.jaui.squeezessh.data.db.dao.KnownHostDao
 import dev.jaui.squeezessh.data.db.dao.PortForwardDao
+import dev.jaui.squeezessh.data.db.dao.PluginLogDao
 import dev.jaui.squeezessh.data.db.dao.SnippetDao
 import dev.jaui.squeezessh.util.SystemTimeSource
 import dev.jaui.squeezessh.util.TimeSource
@@ -31,6 +33,9 @@ object DatabaseModule {
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.NAME)
             .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
+            // Kein destruktives Ausweichen: die Datenbank enthaelt Schluessel und
+            // Zugangsdaten, die sich nicht wiederherstellen liessen.
+            .addMigrations(MIGRATION_1_2)
             .build()
 
     @Provides fun provideConnectionDao(db: AppDatabase): ConnectionDao = db.connectionDao()
@@ -45,6 +50,8 @@ object DatabaseModule {
     @Provides fun providePortForwardDao(db: AppDatabase): PortForwardDao = db.portForwardDao()
 
     @Provides fun provideSnippetDao(db: AppDatabase): SnippetDao = db.snippetDao()
+
+    @Provides fun providePluginLogDao(db: AppDatabase): PluginLogDao = db.pluginLogDao()
 }
 
 @Module

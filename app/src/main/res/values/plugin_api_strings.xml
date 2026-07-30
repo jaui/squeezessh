@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Texte der Plugin-Berechtigungen. Sie stehen im Systemdialog, den Android beim
+      Installieren eines Plugins zeigt — deshalb möglichst konkret, was das Plugin damit
+      tatsächlich kann.
+    -->
+    <string name="permission_group_plugin_api">SqueezeSSH-Erweiterungen</string>
+    <string name="permission_group_plugin_api_description">Zugriff auf Verbindungen, Snippets und Sitzungen von SqueezeSSH</string>
+
+    <string name="permission_read_connections">Verbindungen lesen</string>
+    <string name="permission_read_connections_description">Namen, Adressen und Ports der gespeicherten Verbindungen lesen. Passwörter und Schlüssel sind nicht enthalten.</string>
+    <string name="permission_write_connections">Verbindungen ändern</string>
+    <string name="permission_write_connections_description">Verbindungen anlegen, ändern und löschen. Eine geänderte Adresse kann Anmeldungen auf einen anderen Server lenken.</string>
+
+    <string name="permission_read_connection_groups">Gruppen lesen</string>
+    <string name="permission_read_connection_groups_description">Gruppen und ihre Zuordnungen lesen.</string>
+    <string name="permission_write_connection_groups">Gruppen ändern</string>
+    <string name="permission_write_connection_groups_description">Gruppen anlegen, umbenennen, löschen und Verbindungen zuordnen.</string>
+
+    <string name="permission_read_port_forwards">Weiterleitungen lesen</string>
+    <string name="permission_read_port_forwards_description">Eingerichtete Port-Weiterleitungen lesen.</string>
+    <string name="permission_write_port_forwards">Weiterleitungen ändern</string>
+    <string name="permission_write_port_forwards_description">Port-Weiterleitungen anlegen, ändern und löschen.</string>
+
+    <string name="permission_read_snippets">Snippets lesen</string>
+    <string name="permission_read_snippets_description">Gespeicherte Befehlszeilen lesen.</string>
+    <string name="permission_write_snippets">Snippets ändern</string>
+    <string name="permission_write_snippets_description">Befehlszeilen anlegen, ändern und löschen.</string>
+
+    <string name="permission_read_plugin_log">Plugin-Protokoll lesen</string>
+    <string name="permission_read_plugin_log_description">Nachlesen, was Erweiterungen getan haben.</string>
+
+    <string name="permission_open_sessions">Sitzungen aufbauen</string>
+    <string name="permission_open_sessions_description">Verbindungen aufbauen und Befehle darin ausführen. Das entspricht dem Zugriff, den du selbst auf diesen Servern hast.</string>
+    <string name="permission_open_sftp_sessions">Dateien übertragen</string>
+    <string name="permission_open_sftp_sessions_description">Über SFTP auf Dateien der verbundenen Server zugreifen.</string>
+</resources>
