@@ -43,6 +43,7 @@ class AppSettings @Inject constructor(
     val terminal: Flow<TerminalSettings> = store.data.map { prefs ->
         TerminalSettings(
             themeId = prefs[Keys.TERMINAL_THEME] ?: DEFAULT_TERMINAL_THEME,
+            fontId = prefs[Keys.TERMINAL_FONT] ?: DEFAULT_TERMINAL_FONT,
             fontSizePx = prefs[Keys.TERMINAL_FONT_SIZE] ?: TerminalView.DEFAULT_TEXT_SIZE_PX,
             marginDp = prefs[Keys.TERMINAL_MARGIN] ?: 0,
             terminalType = prefs[Keys.TERMINAL_TYPE] ?: DEFAULT_TERMINAL_TYPE,
@@ -54,6 +55,8 @@ class AppSettings @Inject constructor(
     }
 
     suspend fun setTerminalTheme(id: String) = store.edit { it[Keys.TERMINAL_THEME] = id }
+
+    suspend fun setTerminalFont(id: String) = store.edit { it[Keys.TERMINAL_FONT] = id }
 
     suspend fun setTerminalFontSize(sizePx: Int) = store.edit {
         // Dieselben Grenzen wie beim Zoomen mit zwei Fingern — sonst liesse sich hier
@@ -127,6 +130,7 @@ class AppSettings @Inject constructor(
     private object Keys {
         val THEME_DARK = stringPreferencesKey("theme:dark")
         val TERMINAL_THEME = stringPreferencesKey("terminal:theme")
+        val TERMINAL_FONT = stringPreferencesKey("terminal:font")
         val TERMINAL_FONT_SIZE = intPreferencesKey("terminal:font_size")
         val TERMINAL_MARGIN = intPreferencesKey("terminal:margin")
         val TERMINAL_TYPE = stringPreferencesKey("terminal:type")
@@ -144,6 +148,7 @@ class AppSettings @Inject constructor(
 
     companion object {
         const val DEFAULT_TERMINAL_THEME = "dark"
+        const val DEFAULT_TERMINAL_FONT = "system"
 
         /**
          * `xterm-256color` statt JuiceSSHs `linux`: Termux' Emulator kann 256 Farben, und

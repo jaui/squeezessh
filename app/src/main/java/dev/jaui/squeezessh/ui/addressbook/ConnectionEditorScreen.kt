@@ -14,7 +14,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
@@ -34,6 +37,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -155,17 +159,44 @@ fun ConnectionEditorScreen(
                     )
                 } else {
                     Text(
-                        "Werden beim Verbinden in dieser Reihenfolge probiert.",
+                        "Werden beim Verbinden von oben nach unten probiert.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    WrappingChips {
-                        state.availableIdentities.forEach { identity ->
-                            FilterChip(
-                                selected = identity.id in state.selectedIdentityIds,
-                                onClick = { viewModel.onIdentityToggled(identity.id) },
-                                label = { Text(identity.displayName) },
+
+                    state.selectedIdentityIds.forEachIndexed { index, identityId ->
+                        val identity = state.availableIdentities.firstOrNull { it.id == identityId }
+                            ?: return@forEachIndexed
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "${index + 1}. ${identity.displayName}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f),
                             )
+                            IconButton(
+                                onClick = { viewModel.moveIdentity(identityId, up = true) },
+                                enabled = index > 0,
+                            ) { Icon(Icons.Default.ArrowUpward, contentDescription = "Nach oben") }
+                            IconButton(
+                                onClick = { viewModel.moveIdentity(identityId, up = false) },
+                                enabled = index < state.selectedIdentityIds.lastIndex,
+                            ) { Icon(Icons.Default.ArrowDownward, contentDescription = "Nach unten") }
+                            IconButton(onClick = { viewModel.onIdentityToggled(identityId) }) {
+                                Icon(Icons.Default.Close, contentDescription = "Entfernen")
+                            }
+                        }
+                    }
+
+                    val unselected = state.availableIdentities
+                        .filterNot { it.id in state.selectedIdentityIds }
+                    if (unselected.isNotEmpty()) {
+                        WrappingChips {
+                            unselected.forEach { identity ->
+                                AssistChip(
+                                    onClick = { viewModel.onIdentityToggled(identity.id) },
+                                    label = { Text("+ ${identity.displayName}") },
+                                )
+                            }
                         }
                     }
                 }

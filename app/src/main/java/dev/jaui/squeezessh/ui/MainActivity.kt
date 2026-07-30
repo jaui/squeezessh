@@ -1,8 +1,13 @@
 package dev.jaui.squeezessh.ui
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,6 +17,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -76,7 +83,10 @@ class MainActivity : FragmentActivity() {
                 when (lockState) {
                     LockState.UNKNOWN -> Unit
                     LockState.LOCKED -> LockScreen()
-                    LockState.UNLOCKED -> SqueezeSshApp(intent)
+                    LockState.UNLOCKED -> {
+                        AskForNotificationPermission()
+                        SqueezeSshApp(intent)
+                    }
                 }
             }
         }
@@ -104,6 +114,33 @@ class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         recreate()
+    }
+}
+
+/**
+ * Fragt einmalig nach der Erlaubnis fuer Benachrichtigungen.
+ *
+ * Seit Android 13 genuegt der Eintrag im Manifest nicht: ohne diese Zustimmung wirft das
+ * System alle Benachrichtigungen der App weg — auch die eines Vordergrunddienstes. Damit
+ * waeren die offenen Sitzungen und der Fortschritt von Dateiuebertragungen unsichtbar.
+ * Lehnt der Nutzer ab, laeuft alles weiter, nur eben stumm; deshalb wird hier nichts
+ * erklaert und nicht nachgefragt.
+ */
+@Composable
+private fun AskForNotificationPermission() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+
+    val context = LocalContext.current
+    val request = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { }
+
+    LaunchedEffect(Unit) {
+        val granted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) request.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }
 
@@ -158,6 +195,20 @@ private fun SqueezeSshApp(intent: Intent?) {
 
         composable(Route.SNIPPETS) {
             SnippetsScreen(onBack = { navController.popBackStack() })
+        }
+
+        // Auswahlmodus: der gewaehlte Text geht an den Eintrag zurueck, von dem aus
+        // geoeffnet wurde. Ueber den SavedStateHandle, weil Navigation-Compose keinen
+        // anderen Rueckweg kennt.
+        composable(Route.SNIPPET_PICKER) {
+            SnippetsScreen(
+                onBack = { navController.popBackStack() },
+                onSend = { text ->
+                    navController.previousBackStackEntry
+                        ?.savedStateHandle
+                        ?.set(SNIPPET_RESULT, text)
+                },
+            )
         }
 
         composable(Route.SFTP) {
@@ -222,12 +273,19 @@ private fun SqueezeSshApp(intent: Intent?) {
             ),
         ) { entry ->
             val id = entry.arguments?.getLong("connectionId") ?: NO_CONNECTION
+            val snippet by entry.savedStateHandle
+                .getStateFlow<String?>(SNIPPET_RESULT, null)
+                .collectAsStateWithLifecycle()
+
             TerminalScreen(
                 connectionId = id.takeIf { it != NO_CONNECTION },
                 onBack = { navController.popBackStack() },
                 onAddSession = { navController.navigate(Route.ADDRESS_BOOK) },
                 onOpenFiles = { navController.navigate(Route.SFTP) },
                 onOpenForwards = { navController.navigate(Route.FORWARDS) },
+                onOpenSnippets = { navController.navigate(Route.SNIPPET_PICKER) },
+                pendingSnippet = snippet,
+                onSnippetConsumed = { entry.savedStateHandle[SNIPPET_RESULT] = null },
             )
         }
     }
@@ -260,4 +318,7 @@ private object Route {
     const val FORWARDS = "forwards"
     const val SETTINGS = "settings"
     const val SNIPPETS = "snippets"
+    const val SNIPPET_PICKER = "snippetpicker"
 }
+
+private const val SNIPPET_RESULT = "snippetResult"

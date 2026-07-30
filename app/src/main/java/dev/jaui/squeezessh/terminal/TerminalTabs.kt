@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -28,6 +29,7 @@ import javax.inject.Singleton
 @Singleton
 class TerminalTabs @Inject constructor(
     private val sessions: SshSessionManager,
+    private val settings: dev.jaui.squeezessh.data.settings.AppSettings,
     private val io: CoroutineDispatcher,
 ) {
 
@@ -93,8 +95,12 @@ class TerminalTabs @Inject constructor(
         onHostKey: suspend (HostKeyPrompt) -> Boolean,
         onProgress: (SshConnectionState) -> Unit = {},
     ): Tab {
+        // Der TERM-Typ muss beim Oeffnen des PTY feststehen — spaeter aendern liesse er
+        // sich nur durch eine neue Sitzung.
+        val terminalSettings = settings.terminal.first()
         val session = sessions.open(
             connectionId = connectionId,
+            terminalType = terminalSettings.terminalType,
             onHostKey = onHostKey,
             onProgress = onProgress,
         )

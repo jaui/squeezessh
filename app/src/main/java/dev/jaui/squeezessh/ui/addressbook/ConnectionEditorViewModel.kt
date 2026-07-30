@@ -63,7 +63,7 @@ class ConnectionEditorViewModel @Inject constructor(
             backspaceMode = existing?.backspaceMode ?: BackspaceMode.DELETE,
             groupId = existing?.groupId,
             viaConnectionId = existing?.viaConnectionId,
-            selectedIdentityIds = linkedIdentityIds.orEmpty().toSet(),
+            selectedIdentityIds = linkedIdentityIds.orEmpty(),
             availableGroups = allGroups,
             availableIdentities = allIdentities,
             possibleJumpHosts = possibleJumpHosts,
@@ -97,6 +97,7 @@ class ConnectionEditorViewModel @Inject constructor(
 
     fun onJumpHostChanged(value: Long?) = _state.update { it.copy(viaConnectionId = value) }
 
+    /** Neu gewaehlte Identitaeten kommen ans Ende — die Reihenfolge ist bedeutungstragend. */
     fun onIdentityToggled(identityId: Long) = _state.update { current ->
         val selected = current.selectedIdentityIds
         current.copy(
@@ -106,6 +107,21 @@ class ConnectionEditorViewModel @Inject constructor(
                 selected + identityId
             },
         )
+    }
+
+    /**
+     * Verschiebt eine Identitaet in der Probierreihenfolge.
+     *
+     * Pfeile statt Ziehen: die Liste ist kurz, und ein Ziehen zwischen Chips ist auf einem
+     * Touchscreen schwerer zu treffen als zwei Knoepfe.
+     */
+    fun moveIdentity(identityId: Long, up: Boolean) = _state.update { current ->
+        val order = current.selectedIdentityIds.toMutableList()
+        val index = order.indexOf(identityId)
+        val target = index + if (up) -1 else 1
+        if (index < 0 || target !in order.indices) return@update current
+        order[index] = order[target].also { order[target] = order[index] }
+        current.copy(selectedIdentityIds = order)
     }
 
     fun createGroup(name: String) {
@@ -162,7 +178,7 @@ class ConnectionEditorViewModel @Inject constructor(
             )
             connectionId
         }
-        connections.setIdentities(id, current.selectedIdentityIds.toList())
+        connections.setIdentities(id, current.selectedIdentityIds)
         return true
     }
 
@@ -180,7 +196,8 @@ data class ConnectionEditorState(
     val backspaceMode: BackspaceMode = BackspaceMode.DELETE,
     val groupId: Long? = null,
     val viaConnectionId: Long? = null,
-    val selectedIdentityIds: Set<Long> = emptySet(),
+    /** Reihenfolge ist bedeutungstragend: so werden sie beim Verbinden durchprobiert. */
+    val selectedIdentityIds: List<Long> = emptyList(),
     val availableGroups: List<ConnectionGroupEntity> = emptyList(),
     val availableIdentities: List<IdentityEntity> = emptyList(),
     val possibleJumpHosts: List<ConnectionEntity> = emptyList(),

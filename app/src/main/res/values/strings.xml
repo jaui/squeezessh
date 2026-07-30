@@ -5,6 +5,9 @@
     <string name="notification_channel_sessions">Offene Sitzungen</string>
     <string name="notification_channel_sessions_description">Hält Verbindungen offen, während die App im Hintergrund ist.</string>
 
+    <string name="notification_channel_transfers">Dateiübertragungen</string>
+    <string name="notification_channel_transfers_description">Zeigt laufende Up- und Downloads und hält sie am Leben, während die App im Hintergrund ist.</string>
+
     <string name="widget_description">Häufig genutzte Verbindungen direkt öffnen</string>
     <string name="widget_empty">Noch keine Verbindungen</string>
 

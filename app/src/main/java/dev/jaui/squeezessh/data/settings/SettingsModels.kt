@@ -87,6 +87,7 @@ enum class AutoLockDelay(val seconds: Int, val label: String) {
 
 data class TerminalSettings(
     val themeId: String,
+    val fontId: String,
     val fontSizePx: Int,
     val marginDp: Int,
     val terminalType: String,

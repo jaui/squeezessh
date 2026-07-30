@@ -14,7 +14,7 @@ Speicherformat des Originals.
 | M5 | Address Book UI | ✅ erledigt |
 | M6 | Port-Forwarding und SFTP | ✅ erledigt |
 | M7 | Settings, Snippets, App-Lock, Widget | ✅ erledigt |
-| M8 | EC2-Sync | offen |
+| M8 | EC2-Sync | zurückgestellt (bleibt im Plan) |
 | M9 | Plugin-API-Kompatibilität | offen |
 
 ## Abweichungen vom ursprünglichen Plan
@@ -66,15 +66,39 @@ Konstanten im Programmcode und dem Kontonamen; wer die Datei hatte, hatte den PI
 Delegat hält eine verborgene, prozessweite Instanz — bequem, aber in Tests nicht
 zurücksetzbar. Zwei Tests fielen darauf herein, bevor die Kopplung aufgelöst war.
 
-**Noch nicht umgesetzt aus M4/M5/M6/M7:** umschaltbare Schriftarten in der Oberfläche (Themes und
-Schnittstelle stehen), Umsortieren von Identitäten pro Verbindung (die Reihenfolge wird
-gespeichert, ist aber noch nicht per Drag änderbar), Export privater Schlüssel,
-Fortschritts-Notification für Übertragungen (Fortschritt, Pause, Fortsetzen und Abbruch
-gibt es im Dateibrowser, aber noch nicht in der Statusleiste). Aus M7: die
-Terminal-Einstellungen (Farbschema, Schriftgröße, Rand, TERM, Signalton,
-Tastenleisten-Position, Wischverhalten) werden gespeichert, aber vom Terminal noch nicht
-gelesen — es benutzt weiterhin seine Vorgaben. Snippets lassen sich verwalten, aber noch
-nicht aus dem Terminal heraus einfügen.
+**Umsortiert wird mit Pfeilen, nicht per Ziehen.** Die Probierreihenfolge der Identitäten
+ist bedeutungstragend und wird deshalb als numerierte Liste mit Hoch/Runter geführt. Ein
+Ziehen zwischen Chips ist auf einem Touchscreen schlechter zu treffen, und die Listen sind
+kurz.
+
+**`onScroll` liefert Teilstücke, keine Gesamtstrecke.** Der waagerechte Wisch hat
+anfänglich nie ausgelöst, weil der Schwellwert auf `distanceX` eines einzelnen Aufrufs
+angewandt wurde — das sind meist wenige Pixel. Die Bewegung wird jetzt über die ganze
+Geste summiert und höchstens einmal ausgewertet; sobald genug senkrecht gewandert wurde,
+bleibt es Scrollen.
+
+**Fortschritt wird gedrosselt veröffentlicht.** `SftpSession` meldet nach jedem
+32-KiB-Häppchen. Ungebremst wurden daraus bei 400 MiB über zwölftausend
+Zustandsänderungen, die Liste und Benachrichtigung jedes Mal neu zeichneten — der Emulator
+war daran nicht mehr bedienbar. Jetzt höchstens fünf Aktualisierungen je Sekunde, der
+letzte Wert wird am Ende nachgereicht.
+
+**`POST_NOTIFICATIONS` muss zur Laufzeit erfragt werden.** Der Manifest-Eintrag genügt seit
+Android 13 nicht: ohne Zustimmung verwirft das System auch die Benachrichtigung eines
+Vordergrunddienstes. Offene Sitzungen und Übertragungsfortschritt waren dadurch unsichtbar
+(`numEnqueuedByApp=1578`, `numPostedByApp=0`).
+
+**Ein `remember` im Terminal überlebt keinen Ausflug.** Navigation-Compose verwirft den
+Bildschirm, wenn Dateien, Weiterleitungen oder die Snippet-Auswahl darüber liegen. Der
+Merker „diese Verbindung ist schon offen" muss deshalb `rememberSaveable` sein — sonst
+öffnete jede Rückkehr eine weitere Sitzung. Aus demselben Grund muss der eingefügte
+Snippet-Text auf die wiederhergestellte View warten, statt beim ersten Durchlauf ins Leere
+zu laufen.
+
+**Noch nicht umgesetzt aus M4/M5/M6/M7:** nichts mehr — die zuletzt offenen Punkte
+(Schriftartwahl, Terminal liest seine Einstellungen, Snippets aus dem Terminal, Export
+privater Schlüssel, Umsortieren von Identitäten, Fortschritts-Notification) sind erledigt
+und auf dem Emulator gegen die Testcontainer geprüft.
 
 ## Offene Entscheidungen
 

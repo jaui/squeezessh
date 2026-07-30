@@ -8,11 +8,14 @@ import dev.jaui.squeezessh.ssh.HostKeyPrompt
 import dev.jaui.squeezessh.ssh.SshConnectionState
 import dev.jaui.squeezessh.ssh.SshError
 import dev.jaui.squeezessh.ssh.SshException
+import dev.jaui.squeezessh.data.settings.AppSettings
+import dev.jaui.squeezessh.data.settings.TerminalSettings
 import dev.jaui.squeezessh.terminal.TerminalTabs
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -21,7 +24,29 @@ import javax.inject.Inject
 class TerminalViewModel @Inject constructor(
     application: Application,
     val tabs: TerminalTabs,
+    settings: AppSettings,
 ) : AndroidViewModel(application) {
+
+    /**
+     * Die Terminal-Einstellungen als Datenstrom: eine Aenderung im Einstellungsbildschirm
+     * wirkt sofort auf die offene Sitzung, ohne dass sie neu aufgebaut werden muss. Nur
+     * der TERM-Typ ist davon ausgenommen — der steht mit dem PTY fest.
+     */
+    val terminalSettings: StateFlow<TerminalSettings> = settings.terminal.stateIn(
+        viewModelScope,
+        kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000),
+        TerminalSettings(
+            themeId = AppSettings.DEFAULT_TERMINAL_THEME,
+            fontId = AppSettings.DEFAULT_TERMINAL_FONT,
+            fontSizePx = dev.jaui.squeezessh.terminal.TerminalView.DEFAULT_TEXT_SIZE_PX,
+            marginDp = 0,
+            terminalType = AppSettings.DEFAULT_TERMINAL_TYPE,
+            utf8 = true,
+            bellMode = dev.jaui.squeezessh.data.settings.BellMode.NONE,
+            keyboardPosition = dev.jaui.squeezessh.data.settings.KeyboardPosition.BOTTOM,
+            horizontalSwipeMode = dev.jaui.squeezessh.data.settings.HorizontalSwipeMode.NONE,
+        ),
+    )
 
     private val _state = MutableStateFlow(TerminalUiState())
     val state: StateFlow<TerminalUiState> = _state.asStateFlow()
@@ -77,6 +102,16 @@ class TerminalViewModel @Inject constructor(
     }
 
     fun activateTab(tabId: Long) = tabs.activate(tabId)
+
+    /** Naechste oder vorherige Sitzung, umlaufend. */
+    fun switchSession(forward: Boolean) {
+        val open = tabs.tabs.value
+        if (open.size < 2) return
+        val current = open.indexOfFirst { it.id == tabs.activeTabId.value }
+        if (current < 0) return
+        val next = ((current + if (forward) 1 else -1) + open.size) % open.size
+        tabs.activate(open[next].id)
+    }
 
     fun closeTab(tabId: Long) {
         viewModelScope.launch { tabs.close(getApplication(), tabId) }

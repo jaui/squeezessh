@@ -16,6 +16,7 @@ import android.view.inputmethod.BaseInputConnection
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
+import dev.jaui.squeezessh.data.settings.HorizontalSwipeMode
 import com.termux.terminal.KeyHandler
 import com.termux.terminal.TerminalEmulator
 import com.termux.view.TerminalRenderer
@@ -50,6 +51,14 @@ class TerminalView @JvmOverloads constructor(
     /** Meldet den markierten Text, oder `null` wenn nichts markiert ist. */
     var onSelectionChanged: ((String?) -> Unit)? = null
 
+    /**
+     * Was ein waagerechter Wisch tut. Bei [HorizontalSwipeMode.SWITCH_SESSION] entscheidet
+     * die Oberflaeche, welcher Tab als Naechstes kommt — die View kennt die anderen nicht.
+     */
+    var horizontalSwipeMode: HorizontalSwipeMode = HorizontalSwipeMode.NONE
+
+    var onSwitchSession: ((forward: Boolean) -> Unit)? = null
+
     private var typeface: Typeface = Typeface.MONOSPACE
     private var renderer = TerminalRenderer(DEFAULT_TEXT_SIZE_PX, Typeface.MONOSPACE)
     private var lineSpacingAndAscent = 0
@@ -62,6 +71,13 @@ class TerminalView @JvmOverloads constructor(
     /** „Klebrige" Modifikatoren aus der Zusatztastenleiste: gelten fuer genau einen Anschlag. */
     private var pendingControl = false
     private var pendingAlt = false
+
+    /** Aufsummierte Bewegung der laufenden Geste (siehe `onScroll`). */
+    private var gestureDx = 0f
+    private var gestureDy = 0f
+
+    /** true, sobald entschieden ist, was die Geste war — danach aendert sie ihre Rolle nicht mehr. */
+    private var gestureSettled = false
 
     /** Zuletzt an den Server gemeldete Groesse, um unnoetige Zuruecksetzungen zu vermeiden. */
     private var appliedColumns = 0
@@ -97,7 +113,13 @@ class TerminalView @JvmOverloads constructor(
     private val gestureDetector = GestureDetector(
         context,
         object : GestureDetector.SimpleOnGestureListener() {
-            override fun onDown(e: MotionEvent) = true
+            override fun onDown(e: MotionEvent): Boolean {
+                // Jede Geste faengt bei null an, sonst wirkt die vorige nach.
+                gestureDx = 0f
+                gestureDy = 0f
+                gestureSettled = false
+                return true
+            }
 
             override fun onSingleTapUp(e: MotionEvent): Boolean {
                 if (selection != null) {
@@ -116,6 +138,29 @@ class TerminalView @JvmOverloads constructor(
                 distanceY: Float,
             ): Boolean {
                 val emulator = bridge?.emulator ?: return false
+
+                // `distanceX`/`distanceY` sind nur der Zuwachs seit dem letzten Aufruf —
+                // meist wenige Pixel. Ein Schwellwert darauf wuerde entweder nie oder
+                // mehrfach je Geste ausloesen, deshalb wird ueber die ganze Geste summiert.
+                if (horizontalSwipeMode != HorizontalSwipeMode.NONE && !gestureSettled) {
+                    gestureDx += distanceX
+                    gestureDy += distanceY
+
+                    // Ueberwiegt die waagerechte Bewegung deutlich, ist ein Wisch gemeint
+                    // und kein Scrollen. Der Faktor verhindert, dass ein schraeges Scrollen
+                    // versehentlich die Sitzung wechselt.
+                    if (abs(gestureDx) > HORIZONTAL_SWIPE_THRESHOLD_PX &&
+                        abs(gestureDx) > abs(gestureDy) * HORIZONTAL_SWIPE_RATIO
+                    ) {
+                        gestureSettled = true
+                        handleHorizontalSwipe(gestureDx)
+                        return true
+                    }
+                    // Sobald genug senkrecht gewandert wurde, ist es Scrollen und bleibt
+                    // es auch — sonst kippte eine lange Geste am Ende noch in einen Wisch.
+                    if (abs(gestureDy) > HORIZONTAL_SWIPE_THRESHOLD_PX) gestureSettled = true
+                }
+
                 val rows = (distanceY / renderer.fontLineSpacing).roundToInt()
                 if (rows != 0) scrollRows(rows, emulator)
                 return true
@@ -332,6 +377,20 @@ class TerminalView @JvmOverloads constructor(
         invalidate()
     }
 
+    /**
+     * [totalDistanceX] ist positiv, wenn der Finger nach links gewandert ist — der Inhalt
+     * bewegt sich also nach vorn. Der Schwellwert ist beim Aufrufer schon geprueft.
+     */
+    private fun handleHorizontalSwipe(totalDistanceX: Float) {
+        val forward = totalDistanceX > 0
+        when (horizontalSwipeMode) {
+            HorizontalSwipeMode.SWITCH_SESSION -> onSwitchSession?.invoke(forward)
+            HorizontalSwipeMode.ARROW_KEYS ->
+                sendKeyCode(if (forward) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT)
+            HorizontalSwipeMode.NONE -> Unit
+        }
+    }
+
     fun scrollToBottom() {
         topRow = 0
         notifyScrollPosition()
@@ -536,5 +595,9 @@ class TerminalView @JvmOverloads constructor(
         /** Grosszuegiger als der sichtbare Griff — Finger sind ungenau. */
         private const val HANDLE_TOUCH_RADIUS_PX = 60f
         private const val HANDLE_COLOR = 0xFF64B5F6.toInt()
+
+        /** Waagerechte Bewegung muss die senkrechte um so viel uebertreffen. */
+        private const val HORIZONTAL_SWIPE_RATIO = 2f
+        private const val HORIZONTAL_SWIPE_THRESHOLD_PX = 40f
     }
 }

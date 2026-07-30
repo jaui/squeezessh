@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pfeile auf und ab: Uebertragung in beide Richtungen. Muss einfarbig sein. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFF">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M7,3 L3,9 L6,9 L6,21 L8,21 L8,9 L11,9 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M17,21 L21,15 L18,15 L18,3 L16,3 L16,15 L13,15 Z" />
+</vector>

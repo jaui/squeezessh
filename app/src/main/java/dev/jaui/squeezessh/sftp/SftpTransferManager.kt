@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -33,6 +34,8 @@ class SftpTransferManager @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + io)
     private val nextId = AtomicLong(1)
     private val jobs = mutableMapOf<Long, Job>()
+    private val pendingProgress = ConcurrentHashMap<Long, Long>()
+    private val lastPublishedAt = ConcurrentHashMap<Long, Long>()
 
     private val _transfers = MutableStateFlow<List<SftpTransfer>>(emptyList())
     val transfers: StateFlow<List<SftpTransfer>> = _transfers.asStateFlow()
@@ -108,7 +111,13 @@ class SftpTransferManager @Inject constructor(
             direction = direction,
             totalBytes = size,
         )
+        // Erst eintragen, dann den Dienst starten: er beendet sich selbst, wenn die Liste
+        // leer ist — in der anderen Reihenfolge koennte er sich beenden, bevor er ueberhaupt
+        // in den Vordergrund gegangen ist.
         _transfers.update { it + transfer }
+        // Der Dienst haelt den Prozess, solange etwas laeuft — sonst bricht die
+        // Uebertragung ab, sobald der Nutzer die App verlaesst.
+        SftpTransferService.start(context)
         return transfer
     }
 
@@ -125,11 +134,13 @@ class SftpTransferManager @Inject constructor(
             val current = _transfers.value.firstOrNull { it.id == id } ?: return@launch
             try {
                 body(current)
+                flushProgress(id)
                 // Nur als fertig markieren, wenn nicht zwischendurch angehalten wurde.
                 if (_transfers.value.firstOrNull { it.id == id }?.state == TransferState.RUNNING) {
                     setState(id, TransferState.DONE)
                 }
             } catch (e: IOException) {
+                flushProgress(id)
                 setFailed(id, e.message ?: "Übertragung fehlgeschlagen")
             }
         }
@@ -138,8 +149,29 @@ class SftpTransferManager @Inject constructor(
     private fun shouldContinue(id: Long): Boolean =
         _transfers.value.firstOrNull { it.id == id }?.state == TransferState.RUNNING
 
-    private fun updateProgress(id: Long, transferred: Long) = _transfers.update { list ->
-        list.map { if (it.id == id) it.copy(transferredBytes = transferred) else it }
+    /**
+     * Nimmt den Fortschritt an, veroeffentlicht ihn aber gedrosselt.
+     *
+     * [SftpSession] meldet nach jedem 32-KiB-Haeppchen; bei einer 400-MiB-Datei waeren das
+     * ueber zwoelftausend Zustandsaenderungen, die jede Liste und jede Benachrichtigung neu
+     * zeichnen — der Emulator ist daran unbenutzbar geworden. Der letzte Wert wird immer
+     * gemerkt und am Ende ueber [flushProgress] nachgereicht, damit die Anzeige nicht kurz
+     * vor dem Ziel stehen bleibt.
+     */
+    private fun updateProgress(id: Long, transferred: Long) {
+        pendingProgress[id] = transferred
+        val now = System.nanoTime()
+        val last = lastPublishedAt[id] ?: 0L
+        if (now - last < PROGRESS_INTERVAL_NANOS) return
+        lastPublishedAt[id] = now
+        flushProgress(id)
+    }
+
+    private fun flushProgress(id: Long) {
+        val value = pendingProgress[id] ?: return
+        _transfers.update { list ->
+            list.map { if (it.id == id) it.copy(transferredBytes = value) else it }
+        }
     }
 
     private fun setState(id: Long, state: TransferState) = _transfers.update { list ->
@@ -150,6 +182,11 @@ class SftpTransferManager @Inject constructor(
         list.map {
             if (it.id == id) it.copy(state = TransferState.FAILED, error = message) else it
         }
+    }
+
+    private companion object {
+        /** Fuenf Aktualisierungen je Sekunde reichen fuer eine Fortschrittsanzeige. */
+        const val PROGRESS_INTERVAL_NANOS = 200_000_000L
     }
 }
 

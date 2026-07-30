@@ -117,6 +117,19 @@ class IdentityEditorViewModel @Inject constructor(
 
     fun dismissError() = _state.update { it.copy(error = null) }
 
+    /**
+     * Gibt den privaten Schluessel im Klartext heraus — ausschliesslich fuer den Export.
+     *
+     * Das ist die einzige Stelle, an der er den Vault verlaesst, und sie ist bewusst
+     * ausdruecklich: ein Export ist eine Entscheidung des Nutzers, kein Nebeneffekt.
+     */
+    suspend fun exportablePrivateKey(): String? = withContext(io) {
+        _state.value.privateKeyPem.takeIf { it.isNotBlank() }?.let { return@withContext it }
+        val existing = identityId.takeIf { it != NEW }?.let { identities.findById(it) }
+            ?: return@withContext null
+        identities.revealPrivateKey(existing)
+    }
+
     /** @return `true`, wenn gespeichert wurde. */
     suspend fun save(): Boolean {
         val current = _state.value

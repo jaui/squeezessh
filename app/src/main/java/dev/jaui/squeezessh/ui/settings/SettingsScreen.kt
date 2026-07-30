@@ -41,6 +41,7 @@ import dev.jaui.squeezessh.data.settings.HorizontalSwipeMode
 import dev.jaui.squeezessh.data.settings.KeyboardPosition
 import dev.jaui.squeezessh.data.settings.ThemeMode
 import dev.jaui.squeezessh.security.AppLock
+import dev.jaui.squeezessh.terminal.TerminalFont
 import dev.jaui.squeezessh.terminal.TerminalTheme
 import dev.jaui.squeezessh.terminal.TerminalView
 import kotlin.math.roundToInt
@@ -103,6 +104,13 @@ fun SettingsScreen(
                     options = TerminalTheme.all.map { it.id to it.name },
                     selected = state.terminal.themeId,
                     onSelect = viewModel::setTerminalTheme,
+                )
+
+                ChipChoice(
+                    label = "Schriftart",
+                    options = TerminalFont.entries.map { it.id to it.label },
+                    selected = state.terminal.fontId,
+                    onSelect = viewModel::setTerminalFont,
                 )
 
                 SliderRow(

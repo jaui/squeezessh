@@ -58,6 +58,8 @@ class SettingsViewModel @Inject constructor(
 
     fun setTerminalTheme(id: String) = edit { settings.setTerminalTheme(id) }
 
+    fun setTerminalFont(id: String) = edit { settings.setTerminalFont(id) }
+
     fun setTerminalFontSize(sizePx: Int) = edit { settings.setTerminalFontSize(sizePx) }
 
     fun setTerminalMargin(dp: Int) = edit { settings.setTerminalMargin(dp) }
@@ -123,6 +125,7 @@ data class SettingsUiState(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val terminal: TerminalSettings = TerminalSettings(
         themeId = AppSettings.DEFAULT_TERMINAL_THEME,
+        fontId = AppSettings.DEFAULT_TERMINAL_FONT,
         fontSizePx = 32,
         marginDp = 0,
         terminalType = AppSettings.DEFAULT_TERMINAL_TYPE,

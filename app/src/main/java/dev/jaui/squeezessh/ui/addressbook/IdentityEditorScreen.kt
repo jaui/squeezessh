@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -30,7 +31,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -39,7 +43,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.jaui.squeezessh.data.keys.SshKeyType
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -52,14 +58,33 @@ fun IdentityEditorScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
+    var confirmExport by remember { mutableStateOf(false) }
+
+    val exportKey = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/x-pem-file"),
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            val pem = viewModel.exportablePrivateKey() ?: return@launch
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openOutputStream(uri)?.use { it.write(pem.toByteArray()) }
+                }
+            }
+        }
+    }
+
     val importKey = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
         uri ?: return@rememberLauncherForActivityResult
         scope.launch {
-            val text = runCatching {
-                context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-            }.getOrNull()
+            val text = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openInputStream(uri)?.bufferedReader()
+                        ?.use { it.readText() }
+                }.getOrNull()
+            }
             text?.let(viewModel::onPrivateKeyPasted)
         }
     }
@@ -171,6 +196,10 @@ fun IdentityEditorScreen(
                             )
                             if (state.hasStoredKey || state.privateKeyPem.isNotBlank()) {
                                 AssistChip(
+                                    onClick = { confirmExport = true },
+                                    label = { Text("Exportieren") },
+                                )
+                                AssistChip(
                                     onClick = viewModel::clearKey,
                                     label = { Text("Entfernen") },
                                 )
@@ -230,5 +259,31 @@ fun IdentityEditorScreen(
                 }
             }
         }
+    }
+
+    if (confirmExport) {
+        AlertDialog(
+            onDismissRequest = { confirmExport = false },
+            title = { Text("Privaten Schlüssel exportieren?") },
+            text = {
+                Text(
+                    "Die Datei enthält den Schlüssel im Klartext. Wer sie hat, kann sich " +
+                        "als du anmelden — auch nach dem Löschen aus dieser App. Nur " +
+                        "exportieren, wenn das Ziel genauso geschützt ist wie der Schlüssel " +
+                        "selbst.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmExport = false
+                        exportKey.launch("${state.username.ifBlank { "identity" }}.pem")
+                    },
+                ) { Text("Exportieren") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmExport = false }) { Text("Abbrechen") }
+            },
+        )
     }
 }

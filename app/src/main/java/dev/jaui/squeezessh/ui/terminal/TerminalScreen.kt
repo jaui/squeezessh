@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Folder
@@ -40,6 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +53,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.jaui.squeezessh.data.settings.BellMode
+import dev.jaui.squeezessh.data.settings.KeyboardPosition
+import dev.jaui.squeezessh.data.settings.TerminalSettings
+import dev.jaui.squeezessh.terminal.TerminalFont
 import dev.jaui.squeezessh.terminal.TerminalTabs
 import dev.jaui.squeezessh.terminal.TerminalTheme
 import dev.jaui.squeezessh.terminal.TerminalView
@@ -62,10 +68,15 @@ fun TerminalScreen(
     onAddSession: () -> Unit,
     onOpenFiles: () -> Unit,
     onOpenForwards: () -> Unit,
+    onOpenSnippets: () -> Unit,
+    /** Text, den ein Snippet-Bildschirm zurueckgegeben hat. */
+    pendingSnippet: String? = null,
+    onSnippetConsumed: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: TerminalViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val terminalSettings by viewModel.terminalSettings.collectAsStateWithLifecycle()
     val tabs by viewModel.tabs.tabs.collectAsStateWithLifecycle()
     val activeTabId by viewModel.tabs.activeTabId.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -75,9 +86,35 @@ fun TerminalScreen(
     var altActive by remember { mutableStateOf(false) }
     var selectedText by remember { mutableStateOf<String?>(null) }
 
-    // Ein per Navigation mitgegebenes Ziel wird genau einmal geoeffnet — sonst entstuende
-    // bei jeder Neuzusammensetzung eine weitere Sitzung.
-    LaunchedEffect(connectionId) { connectionId?.let(viewModel::openTab) }
+    // Ein per Navigation mitgegebenes Ziel wird genau einmal geoeffnet.
+    //
+    // Der Merker muss `rememberSaveable` sein: bei einem Ausflug in die Dateien, die
+    // Weiterleitungen oder die Snippet-Auswahl wird dieser Bildschirm verworfen und bei der
+    // Rueckkehr neu zusammengesetzt — ein blosses `remember` wuerde dabei vergessen, dass
+    // die Sitzung schon offen ist, und jedes Mal eine weitere aufbauen. Ein bewusstes
+    // zweites Oeffnen derselben Verbindung laeuft ueber „Weitere Sitzung" und bekommt einen
+    // eigenen Eintrag im Navigationsstapel, also auch einen eigenen Merker.
+    var openedConnectionId by rememberSaveable { mutableStateOf<Long?>(null) }
+    LaunchedEffect(connectionId) {
+        val id = connectionId ?: return@LaunchedEffect
+        if (openedConnectionId == id) return@LaunchedEffect
+        openedConnectionId = id
+        viewModel.openTab(id)
+    }
+
+    // Ein aus der Snippet-Auswahl zurueckgegebener Text geht genau einmal in die Sitzung.
+    //
+    // Die View muss dabei im Schluessel stehen: bei der Rueckkehr aus der Auswahl liegt der
+    // Text schon vor, waehrend `terminalView` noch null ist — Navigation-Compose verwirft
+    // das `remember` beim Wegnavigieren. Ohne diese Bedingung wuerde der Text still
+    // verworfen und trotzdem als verbraucht gemeldet.
+    LaunchedEffect(pendingSnippet, terminalView) {
+        val view = terminalView ?: return@LaunchedEffect
+        pendingSnippet?.let { text ->
+            view.sendText(text)
+            onSnippetConsumed()
+        }
+    }
 
     val activeTab = tabs.firstOrNull { it.id == activeTabId }
 
@@ -92,6 +129,25 @@ fun TerminalScreen(
             .navigationBarsPadding()
             .imePadding(),
     ) {
+        if (activeTab != null && terminalSettings.keyboardPosition == KeyboardPosition.TOP) {
+            ExtraKeysRow(
+                controlActive = controlActive,
+                altActive = altActive,
+                onControlToggle = { controlActive = terminalView?.toggleControl() ?: false },
+                onAltToggle = { altActive = terminalView?.toggleAlt() ?: false },
+                onKey = { keyCode ->
+                    terminalView?.sendKeyCode(keyCode)
+                    controlActive = false
+                    altActive = false
+                },
+                onText = { text ->
+                    terminalView?.sendText(text)
+                    controlActive = false
+                    altActive = false
+                },
+            )
+        }
+
         // Die Tab-Leiste liegt bewusst **ueber** dem Terminal statt darueber im Column:
         // die eingebettete View wird als echte View nach dem Compose-Inhalt gezeichnet
         // und wuerde eine davor liegende Leiste sonst verdecken. Das Terminal bekommt
@@ -112,8 +168,16 @@ fun TerminalScreen(
 
                 else -> {
                     TerminalSurface(
-                        modifier = Modifier.padding(top = if (tabs.isEmpty()) 0.dp else TAB_STRIP_HEIGHT),
+                        modifier = Modifier.padding(
+                            top = (if (tabs.isEmpty()) 0.dp else TAB_STRIP_HEIGHT) +
+                                terminalSettings.marginDp.dp,
+                            start = terminalSettings.marginDp.dp,
+                            end = terminalSettings.marginDp.dp,
+                            bottom = terminalSettings.marginDp.dp,
+                        ),
                         tab = activeTab,
+                        settings = terminalSettings,
+                        onSwitchSession = viewModel::switchSession,
                         onViewReady = { terminalView = it },
                         onSelectionChanged = { selectedText = it },
                         readClipboard = {
@@ -161,11 +225,12 @@ fun TerminalScreen(
                     onAdd = onAddSession,
                     onOpenFiles = onOpenFiles,
                     onOpenForwards = onOpenForwards,
+                    onOpenSnippets = onOpenSnippets,
                 )
             }
         }
 
-        if (activeTab != null) {
+        if (activeTab != null && terminalSettings.keyboardPosition == KeyboardPosition.BOTTOM) {
             ExtraKeysRow(
                 controlActive = controlActive,
                 altActive = altActive,
@@ -201,6 +266,8 @@ fun TerminalScreen(
 private fun TerminalSurface(
     modifier: Modifier = Modifier,
     tab: TerminalTabs.Tab,
+    settings: TerminalSettings,
+    onSwitchSession: (Boolean) -> Unit,
     onViewReady: (TerminalView) -> Unit,
     onSelectionChanged: (String?) -> Unit,
     readClipboard: () -> String?,
@@ -210,23 +277,28 @@ private fun TerminalSurface(
         modifier = modifier.fillMaxSize(),
         factory = { viewContext ->
             TerminalView(viewContext).also { view ->
-                view.applyTheme(TerminalTheme.Dark)
                 view.onSelectionChanged = onSelectionChanged
                 onViewReady(view)
             }
         },
         update = { view ->
+            // Erst Schrift und Groesse, dann anhaengen: beides aendert die Zeilen- und
+            // Spaltenzahl, und die soll der Server nur einmal gemeldet bekommen.
+            view.setTerminalTypeface(TerminalFont.byId(settings.fontId).typeface(view.context))
+            view.setTextSize(settings.fontSizePx)
+            view.applyTheme(TerminalTheme.byId(settings.themeId))
+            view.horizontalSwipeMode = settings.horizontalSwipeMode
+            view.onSwitchSession = onSwitchSession
+
             if (view.bridge !== tab.bridge) {
                 view.attach(tab.bridge)
-                view.applyTheme(TerminalTheme.Dark)
+                view.applyTheme(TerminalTheme.byId(settings.themeId))
                 view.showSoftKeyboard()
             }
             // Nur der sichtbare Tab zeichnet neu. Die uebrigen sammeln weiter Ausgabe in
             // ihrem Emulator, ohne die Oberflaeche zu beschaeftigen.
             tab.onScreenUpdated = view::onScreenUpdated
-            tab.onBell = {
-                view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
-            }
+            tab.onBell = { ringBell(view, settings.bellMode) }
             tab.onClipboardRead = readClipboard
             tab.onClipboardWrite = writeClipboard
         },
@@ -252,6 +324,7 @@ private fun TabStrip(
     onAdd: () -> Unit,
     onOpenFiles: () -> Unit,
     onOpenForwards: () -> Unit,
+    onOpenSnippets: () -> Unit,
 ) {
     // Bewusst kein Material3-Tab: das bezieht seine Farben aus dem Umfeld einer TabRow und
     // waere hier, auf schwarzem Terminal-Hintergrund, unsichtbar. Die Leiste bringt ihre
@@ -317,6 +390,36 @@ private fun TabStrip(
                 contentDescription = "Weiterleitungen",
                 tint = TAB_ACTIVE_TEXT,
             )
+        }
+        IconButton(onClick = onOpenSnippets) {
+            Icon(
+                Icons.Default.Bolt,
+                contentDescription = "Snippets",
+                tint = TAB_ACTIVE_TEXT,
+            )
+        }
+    }
+}
+
+/**
+ * Setzt den Signalton um.
+ *
+ * `SOUND` nutzt den Benachrichtigungston des Systems statt eines eigenen: ein Terminal
+ * braucht keinen Klang, den man erst suchen und mitliefern muesste.
+ */
+private fun ringBell(view: TerminalView, mode: BellMode) {
+    when (mode) {
+        BellMode.NONE -> Unit
+        BellMode.VIBRATE ->
+            view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+        BellMode.SOUND -> runCatching {
+            android.media.RingtoneManager
+                .getRingtone(
+                    view.context,
+                    android.media.RingtoneManager
+                        .getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION),
+                )
+                ?.play()
         }
     }
 }
