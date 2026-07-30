@@ -170,8 +170,12 @@ Die SSH-Tests laufen gegen echte sshd-Container aus
 
 ```powershell
 .\tools\test-sshd\up.ps1
-.\gradlew.bat testDebugUnitTest
+.\gradlew.bat testStandaloneDebugUnitTest
 ```
+
+Seit den Build-Varianten für die Plugin-API gibt es kein `testDebugUnitTest` mehr — der
+Task heißt nach der Variante. `testJuicesshcompatDebugUnitTest` fährt dieselben Tests
+gegen die andere Authority.
 
 Ohne laufende Container werden sie übersprungen, nicht rot. Nicht abgedeckt:
 keyboard-interactive (bräuchte PAM, das Alpines OpenSSH nicht mitbringt).
