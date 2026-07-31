@@ -15,7 +15,7 @@ Speicherformat des Originals.
 | M6 | Port-Forwarding und SFTP | ✅ erledigt |
 | M7 | Settings, Snippets, App-Lock, Widget | ✅ erledigt |
 | M8 | EC2-Sync | zurückgestellt (bleibt im Plan) |
-| M9 | Plugin-API-Kompatibilität | ✅ erledigt (Gegentest mit echtem Plugin steht aus) |
+| M9 | Plugin-API-Kompatibilität | ✅ erledigt, gegen juicessh-performancemonitor belegt |
 
 ## Abweichungen vom ursprünglichen Plan
 
@@ -144,6 +144,33 @@ Gegenseite (`put` ist auch im Original auskommentiert), ohne Ziel ist das nicht 
 `lcd`/`lpwd` setzen ein lokales Arbeitsverzeichnis voraus, das es hier nicht gibt. Alle vier
 melden einen Fehler, statt stillschweigend nichts zu tun.
 
+**Die Kompatibilität hängt am Paketnamen, nicht an der Schnittstelle.** `PluginClient.start()`
+aus Sonellis Bibliothek bindet den Dienst erst, nachdem es geprüft hat, dass ein Paket
+namens `com.sonelli.juicessh` mit `versionCode >= 89` installiert ist:
+
+```java
+PackageInfo info = pm.getPackageInfo("com.sonelli.juicessh", 0);
+if (info.versionCode < MINIMUM_JUICESSH_VERSION_CODE) { showVersionWarning(context); return false; }
+```
+
+Ohne dieses Paket zeigt jedes darauf gebaute Plugin nur „This JuiceSSH plugin requires that
+JuiceSSH 1.5.4 (or newer) be installed“ und bindet gar nichts — Authority, Permissions und
+AIDL sind dann gleichgültig. Vollständige Kompatibilität wäre also nur mit
+`applicationId = "com.sonelli.juicessh"` zu haben, und damit würde sich die App als eine
+fremde ausgeben. Das ist bewusst nicht getan. Für den Test dient
+[`tools/juicessh-version-stub`](../tools/juicessh-version-stub/README.md) — ein leeres APK,
+das nur diese Prüfung erfüllt.
+
+**`Activity.checkCallingPermission()` beantwortet in `onCreate` nichts.** Es gilt nur für
+den Aufrufer einer gerade laufenden IPC-Transaktion; beim Start über
+`startActivityForResult` läuft keine, und die Antwort ist immer „verweigert“. Der Sitzungs­
+aufbau brach dadurch wortlos ab. Gefragt wird jetzt `packageManager.checkPermission(recht,
+aufrufendes Paket)`.
+
+**Auswahllisten im Verbindungseditor werden beobachtet, nicht einmal gelesen.** Wer von dort
+aus eine Identität anlegte, kam zurück und fand sie nicht vor — `load()` liest mit `first()`,
+und der Editor überlebt den Ausflug.
+
 ## Offene Entscheidungen
 
 - **M9 — eigene vs. JuiceSSH-Authority: entschieden.** Zwei Varianten in der Dimension
@@ -154,11 +181,10 @@ melden einen Fehler, statt stillschweigend nichts zu tun.
   `INSTALL_FAILED_DUPLICATE_PERMISSION: … attempting to redeclare permission
   com.sonelli.juicessh.api.v1.permission.OPEN_SFTP_SESSIONS already owned by
   com.sonelli.juicessh`.
-- **M9 — offen bleibt der Gegentest.** Umgesetzt sind Provider, AIDL-Dienste,
-  Sitzungsübergabe und Verwaltung. Ob ein bestehendes Plugin damit tatsächlich
-  zurechtkommt, ist noch nicht belegt: dafür braucht es ein echtes Plugin (etwa
-  `juicessh-performancemonitor`) in der Kompatibilitätsvariante, und die lässt sich nicht
-  neben JuiceSSH installieren.
+- **M9 — Gegentest bestanden, mit einer Einschränkung.** `juicessh-performancemonitor`
+  läuft gegen die Kompatibilitätsvariante: Verbindungsliste aus dem Provider, Bindung an
+  die AIDL-Dienste, Sitzungsaufbau, Befehle, Trennen. Die Einschränkung steht unten unter
+  „Die Kompatibilität hängt am Paketnamen“.
 - **Mosh.** Erfordert einen eigenen NDK-Build von `mosh-client`. Das Datenmodell führt
   `moshCommand` bereits mit, ausgewertet wird es vorerst nicht.
 - **Lokale Shell.** Termux bringt die Bausteine mit; erst nach M4 sinnvoll zu bewerten.

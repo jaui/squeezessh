@@ -129,7 +129,11 @@ class MainActivity : FragmentActivity() {
         if (!PluginSessionRequest.isPluginRequest(data)) return false
         val caller = callingActivity?.packageName ?: return false
 
-        if (checkCallingPermission(PluginContract.PERMISSION_OPEN_SESSIONS) !=
+        // Nicht `checkCallingPermission`: das beantwortet nur, was der Aufrufer einer
+        // gerade laufenden IPC-Transaktion darf — in `onCreate` laeuft keine, und die
+        // Antwort ist dann immer „verweigert". Gefragt wird deshalb die Paketverwaltung
+        // nach dem Recht des Pakets, das uns gestartet hat.
+        if (packageManager.checkPermission(PluginContract.PERMISSION_OPEN_SESSIONS, caller) !=
             PackageManager.PERMISSION_GRANTED
         ) {
             setResult(RESULT_CANCELED)

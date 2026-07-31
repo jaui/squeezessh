@@ -16,6 +16,7 @@ import dev.jaui.squeezessh.data.repository.IdentityRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -39,7 +40,45 @@ class ConnectionEditorViewModel @Inject constructor(
 
     init {
         viewModelScope.launch { load() }
+        viewModelScope.launch { observeChoices() }
     }
+
+    /**
+     * Haelt die Auswahllisten aktuell.
+     *
+     * [load] liest sie nur einmal — und der Editor ueberlebt einen Ausflug: wer von hier aus
+     * eine Identitaet anlegt, kam zurueck und fand sie nicht vor. Beobachtet werden deshalb
+     * nur diese drei Listen; die bearbeiteten Felder bleiben unberuehrt, sonst verloere man
+     * beim Tippen seine Eingabe.
+     */
+    private suspend fun observeChoices() {
+        combine(
+            groups.observeAll(),
+            identities.observeAll(),
+            connections.observeAll(),
+        ) { allGroups, allIdentities, allConnections ->
+            Choices(
+                groups = allGroups,
+                identities = allIdentities,
+                // Eine Verbindung darf nicht ueber sich selbst springen.
+                jumpHosts = allConnections.filter { it.id != connectionId },
+            )
+        }.collect { choices ->
+            _state.update {
+                it.copy(
+                    availableGroups = choices.groups,
+                    availableIdentities = choices.identities,
+                    possibleJumpHosts = choices.jumpHosts,
+                )
+            }
+        }
+    }
+
+    private data class Choices(
+        val groups: List<ConnectionGroupEntity>,
+        val identities: List<IdentityEntity>,
+        val jumpHosts: List<ConnectionEntity>,
+    )
 
     private suspend fun load() {
         val allGroups = groups.observeAll().first()

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Absichtlich leer: keine Activity, kein Dienst, keine Berechtigung, kein Provider.
+  Die Plugin-Bibliothek fragt nur `getPackageInfo("com.sonelli.juicessh")` ab.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:label="JuiceSSH-Versionsattrappe" />
+</manifest>
