@@ -182,6 +182,62 @@ tasks.register<Copy>("publishRelease") {
     }
 }
 
+/**
+ * Haengt das APK an ein GitHub-Release: `.\gradlew :app:publishGithubRelease`.
+ *
+ * Signiert wird lokal — der Keystore verlaesst diesen Rechner nicht, es gibt keine
+ * Signaturgeheimnisse bei GitHub. Hochgeladen wird nur das fertige APK.
+ *
+ * Die Release-Notizen kommen aus `docs/releases/v<version>.md`, wenn es die Datei gibt.
+ * Sonst laesst `gh` sie aus den Commits seit dem letzten Tag erzeugen.
+ *
+ * Verweigert die Arbeit bei einem schmutzigen Arbeitsbaum: ein Tag zeigt sonst auf einen
+ * Commit, der das veroeffentlichte APK nicht enthaelt — hinterher ist das nicht mehr zu sehen.
+ */
+val gitIsDirty = providers.exec {
+    commandLine("git", "status", "--porcelain")
+}.standardOutput.asText.map { it.isNotBlank() }
+
+tasks.register("publishGithubRelease") {
+    group = "distribution"
+    description = "Legt ein GitHub-Release an und laedt das signierte APK hoch."
+    dependsOn("publishRelease")
+
+    val version = APP_VERSION_NAME
+    val dirty = gitIsDirty
+    val distDir = rootProject.layout.projectDirectory.dir("dist")
+    val notesFile = rootProject.layout.projectDirectory.file("docs/releases/v$version.md").asFile
+
+    doLast {
+        check(!dirty.get()) {
+            "Der Arbeitsbaum ist schmutzig. Erst committen — sonst zeigt das Tag v$version auf " +
+                "einen Commit, der dieses APK nicht enthaelt."
+        }
+
+        val apk = distDir.file("squeezessh-$version.apk").asFile
+        require(apk.exists()) { "Nicht gebaut: ${apk.path}" }
+
+        val args = mutableListOf(
+            "gh", "release", "create", "v$version", apk.path,
+            "--title", "v$version",
+        )
+        if (notesFile.exists()) {
+            args += listOf("--notes-file", notesFile.path)
+        } else {
+            args += "--generate-notes"
+        }
+
+        val process = ProcessBuilder(args).redirectErrorStream(true).start()
+        val output = process.inputStream.bufferedReader().readText()
+        val code = process.waitFor()
+        check(code == 0) {
+            "gh release create ist mit Code $code fehlgeschlagen:\n$output\n\n" +
+                "Ist die GitHub CLI installiert und angemeldet? `gh auth status`"
+        }
+        logger.lifecycle(output.trim())
+    }
+}
+
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
