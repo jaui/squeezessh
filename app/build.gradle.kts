@@ -1,8 +1,36 @@
+// Innerhalb des Gradle-Kotlin-DSL verdeckt die `java`-Extension das Paket `java`,
+// java.util.Properties laesst sich deshalb nicht voll qualifiziert ansprechen.
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+}
+
+/**
+ * Die Version folgt den Meilensteinen der Roadmap: M9 ist 0.9.0, eine Nachbesserung
+ * daran 0.9.1. Hier wird sie gepflegt, `versionCode` faellt daraus ab, damit beide
+ * nicht auseinanderlaufen koennen.
+ */
+val APP_VERSION_NAME = "0.9.0"
+
+/** 0.9.0 -> 900, 0.9.1 -> 901, 1.0.0 -> 10000. Monoton, solange minor und patch < 100 bleiben. */
+val APP_VERSION_CODE = APP_VERSION_NAME.split(".").map(String::toInt)
+    .let { (major, minor, patch) -> major * 10000 + minor * 100 + patch }
+
+/**
+ * Signaturmaterial fuer den Release-Build, bewusst ausserhalb der Versionsverwaltung.
+ *
+ * Fehlt die Datei — auf einem frischen Klon der Normalfall —, bleibt der Release-Build
+ * unsigniert, statt fehlzuschlagen. Bauen und Debuggen kann dann trotzdem jeder.
+ */
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
 }
 
 android {
@@ -13,10 +41,21 @@ android {
         applicationId = "dev.jaui.squeezessh"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = APP_VERSION_CODE
+        versionName = APP_VERSION_NAME
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
     }
 
     // Die Plugin-API von JuiceSSH laesst sich nicht mit ihren Originalnamen anbieten und
@@ -57,6 +96,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
     }
 
@@ -112,6 +152,34 @@ ksp {
     // Exportiertes Room-Schema wird eingecheckt: so werden Schema-Aenderungen im
     // Review sichtbar und Migrationstests koennen dagegen laufen.
     arg("room.schemaLocation", "$projectDir/schemas")
+}
+
+/**
+ * Legt das signierte Release-APK unter seinem Auslieferungsnamen in `dist/` ab:
+ * `.\gradlew :app:publishRelease`.
+ *
+ * Gebaut wird die Variante `standalone` — die mit eigener Plugin-API-Authority, die sich
+ * neben JuiceSSH installieren laesst. `juicesshcompat` traegt einen `versionNameSuffix`
+ * und wuerde als `squeezessh-0.9.0-juicesshcompat.apk` herauskommen; sie ist ein
+ * Testwerkzeug und wird nicht ausgeliefert.
+ */
+tasks.register<Copy>("publishRelease") {
+    group = "distribution"
+    description = "Kopiert das signierte Release-APK der Variante standalone nach dist/."
+    dependsOn("assembleStandaloneRelease")
+
+    // Lokale Kopie statt Zugriff auf den Script-Wert: eine Lambda, die den Script-Wert
+    // liest, faengt das ganze Script-Objekt ein, und das kann der Configuration Cache
+    // nicht serialisieren.
+    val version = APP_VERSION_NAME
+
+    from(layout.buildDirectory.file("outputs/apk/standalone/release/app-standalone-release.apk"))
+    into(rootProject.layout.projectDirectory.dir("dist"))
+    rename { "squeezessh-$version.apk" }
+
+    doLast {
+        logger.lifecycle("dist/squeezessh-$version.apk")
+    }
 }
 
 kotlin {

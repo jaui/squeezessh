@@ -36,6 +36,7 @@ build/
 # privater Schluessel zu wenig. Wer hier etwas braucht, nimmt es bewusst mit -f auf.
 *.jks
 *.keystore
+/keystore/
 keystore.properties
 signing.properties
 !debug.keystore
@@ -64,6 +65,11 @@ CLAUDE.local.md
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# --- Auslieferung ---
+# Gebaute APKs gehoeren nicht in die Versionsverwaltung, sie lassen sich aus
+# jedem Commit wieder herstellen.
+/dist/
 
 # --- Sonstiges ---
 *.log
