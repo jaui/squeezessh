@@ -217,8 +217,37 @@ class ConnectionEditorViewModel @Inject constructor(
             )
             connectionId
         }
-        connections.setIdentities(id, current.selectedIdentityIds)
+        connections.setIdentities(id, current.selectedIdentityIds + identityForUsername(current))
         return true
+    }
+
+    /**
+     * Sorgt dafuer, dass ein in der Adresse genannter Benutzer auch als Identitaet existiert.
+     *
+     * `root@host` einzutippen und danach die Identitaet von Hand anzulegen ist eine
+     * Doppelarbeit, die niemand will — der Name steht ja schon da. Angelegt wird sie ohne
+     * Geheimnis; das Passwort fragt der Verbindungsaufbau beim ersten Anmelden ab.
+     *
+     * Ein vorhandener Eintrag mit demselben Benutzernamen wird wiederverwendet, statt einen
+     * zweiten daneben zu stellen. Wurde die Identitaet bereits von Hand ausgewaehlt, passiert
+     * gar nichts: dann ist die Absicht schon ausgedrueckt.
+     *
+     * @return die zu verknuepfende Identitaet, oder leer wenn nichts zu tun ist.
+     */
+    private suspend fun identityForUsername(current: ConnectionEditorState): List<Long> {
+        val username = current.addressUsername?.trim()?.takeIf { it.isNotEmpty() }
+            ?: return emptyList()
+
+        val existing = identities.observeAll().first()
+            .firstOrNull { it.username.equals(username, ignoreCase = false) }
+        if (existing != null) {
+            return if (existing.id in current.selectedIdentityIds) {
+                emptyList()
+            } else {
+                listOf(existing.id)
+            }
+        }
+        return listOf(identities.create(nickname = null, username = username))
     }
 
     companion object {
@@ -247,6 +276,17 @@ data class ConnectionEditorState(
 ) {
     /** Der Benutzername aus dem Adressfeld, falls einer darin steht. */
     val addressUsername: String? get() = parsed?.username ?: pendingUsername
+
+    /**
+     * Ob zu diesem Benutzer schon eine Identitaet existiert.
+     *
+     * Entscheidet nur, was der Editor ankuendigt — verknuepft wird in beiden Faellen, neu
+     * angelegt nur im zweiten.
+     */
+    val addressUsernameKnown: Boolean
+        get() = addressUsername?.trim()?.let { name ->
+            availableIdentities.any { it.username == name }
+        } == true
 
     /** Was beim Speichern herauskaeme — als Rueckmeldung noch vor dem Speichern. */
     val effectiveTarget: String?

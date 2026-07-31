@@ -49,13 +49,14 @@ class SshSessionManager @Inject constructor(
         rows: Int = DEFAULT_ROWS,
         onHostKey: suspend (HostKeyPrompt) -> Boolean,
         onProgress: (SshConnectionState) -> Unit = {},
+        onCredentials: suspend (CredentialPrompt) -> CredentialAnswer? = { null },
     ): SshSession {
         val chain = connections.resolveChain(connectionId)
         if (chain.isEmpty()) {
             throw SshException(SshError.Unexpected("Verbindung $connectionId existiert nicht"))
         }
 
-        val hops = chain.map { it.toHop() }
+        val hops = chain.map { it.toHop(onCredentials) }
         val connection = connector.connect(hops, onHostKey, onProgress)
 
         // Das Oeffnen der Shell schickt Pakete ueber die Leitung und darf deshalb
@@ -121,7 +122,9 @@ class SshSessionManager @Inject constructor(
         }
     }
 
-    private suspend fun ConnectionEntity.toHop(): SshHop {
+    private suspend fun ConnectionEntity.toHop(
+        onCredentials: suspend (CredentialPrompt) -> CredentialAnswer?,
+    ): SshHop {
         val linked = connections.identitiesFor(id)
         val credentials = linked.flatMap { identity ->
             buildList {
@@ -137,13 +140,30 @@ class SshSessionManager @Inject constructor(
                 identities.revealPassword(identity)?.let { add(SshCredential.Password(it)) }
             }
         }
+
+        // Eine Identitaet ohne jedes Geheimnis ist kein Fehler, sondern der Zustand direkt
+        // nach `nutzer@host`: der Name stand in der Adresse, das Passwort nicht. Gefragt
+        // wird deshalb hier, vor dem Verbindungsaufbau — ein Fehlschlag mit
+        // „Anmeldung fehlgeschlagen" waere die unbrauchbarere Antwort auf dieselbe Lage.
+        val identity = linked.firstOrNull()
+        val resolved = if (credentials.isEmpty() && identity != null) {
+            onCredentials(CredentialPrompt(identity.username, address, port))
+                ?.let { answer ->
+                    if (answer.remember) identities.setPassword(identity.id, answer.password)
+                    listOf(SshCredential.Password(answer.password))
+                }
+                .orEmpty()
+        } else {
+            credentials
+        }
+
         return SshHop(
             host = address,
             port = port,
             // Ohne verknuepfte Identitaet gibt es keinen Benutzernamen — das faellt beim
             // Verbinden als Authentifizierungsfehler auf, nicht hier still.
-            username = linked.firstOrNull()?.username.orEmpty(),
-            credentials = credentials,
+            username = identity?.username.orEmpty(),
+            credentials = resolved,
         )
     }
 

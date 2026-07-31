@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.jaui.squeezessh.ssh.CredentialAnswer
+import dev.jaui.squeezessh.ssh.CredentialPrompt
 import dev.jaui.squeezessh.ssh.HostKeyPrompt
 import dev.jaui.squeezessh.ssh.SshConnectionState
 import dev.jaui.squeezessh.ssh.SshError
@@ -70,6 +72,7 @@ class TerminalViewModel @Inject constructor(
                     onProgress = { progress ->
                         _state.update { it.copy(statusLine = progress.describe()) }
                     },
+                    onCredentials = ::askForCredentials,
                 )
                 _state.update { it.copy(connecting = false, statusLine = null) }
             } catch (e: SshException) {
@@ -99,6 +102,30 @@ class TerminalViewModel @Inject constructor(
 
     fun answerHostKey(accepted: Boolean) {
         _state.value.hostKeyRequest?.answer?.complete(accepted)
+    }
+
+    /**
+     * Fragt die Zugangsdaten ab, wenn zur Identitaet noch keine hinterlegt sind.
+     *
+     * Anders als beim Host-Key laeuft der Verbindungsaufbau hier noch **nicht**: gefragt
+     * wird, bevor der erste Socket aufgeht. Es kann also kein Timeout mitlaufen, waehrend
+     * jemand tippt.
+     */
+    private suspend fun askForCredentials(prompt: CredentialPrompt): CredentialAnswer? {
+        val answer = CompletableDeferred<CredentialAnswer?>()
+        _state.update {
+            it.copy(credentialRequest = CredentialRequest(prompt, answer), statusLine = null)
+        }
+        return try {
+            answer.await()
+        } finally {
+            _state.update { it.copy(credentialRequest = null) }
+        }
+    }
+
+    /** [answer] `null` bricht den Verbindungsaufbau ab. */
+    fun answerCredentials(answer: CredentialAnswer?) {
+        _state.value.credentialRequest?.answer?.complete(answer)
     }
 
     fun activateTab(tabId: Long) = tabs.activate(tabId)
@@ -142,9 +169,15 @@ data class TerminalUiState(
     val statusLine: String? = null,
     val error: String? = null,
     val hostKeyRequest: HostKeyRequest? = null,
+    val credentialRequest: CredentialRequest? = null,
 )
 
 data class HostKeyRequest(
     val prompt: HostKeyPrompt,
     val answer: CompletableDeferred<Boolean>,
+)
+
+data class CredentialRequest(
+    val prompt: CredentialPrompt,
+    val answer: CompletableDeferred<CredentialAnswer?>,
 )

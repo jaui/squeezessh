@@ -128,7 +128,13 @@ fun ConnectionEditorScreen(
 
             state.addressUsername?.let { username ->
                 Text(
-                    "Benutzer „$username“ erkannt — passende Identität unten auswählen oder anlegen.",
+                    if (state.addressUsernameKnown) {
+                        "Benutzer „$username“ erkannt — die vorhandene Identität wird beim " +
+                            "Speichern verknüpft."
+                    } else {
+                        "Benutzer „$username“ erkannt — wird beim Speichern als Identität " +
+                            "angelegt. Nach dem Passwort fragt die App beim ersten Verbinden."
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                 )

@@ -16,6 +16,28 @@ data class SshHop(
     val credentials: List<SshCredential>,
 )
 
+/**
+ * Was der Nutzer eingeben muss, wenn zu einer Identitaet noch keine Zugangsdaten hinterlegt
+ * sind.
+ *
+ * Der Fall entsteht regulaer: wer eine Verbindung als `nutzer@host` anlegt, bekommt die
+ * Identitaet automatisch, aber ohne Geheimnis — abgefragt wird es beim ersten Anmelden.
+ */
+data class CredentialPrompt(
+    val username: String,
+    val host: String,
+    val port: Int,
+)
+
+/**
+ * @param remember Speichert das Passwort bei der Identitaet. Ohne das gilt es nur fuer
+ *   diesen einen Verbindungsaufbau und wird danach vergessen.
+ */
+data class CredentialAnswer(
+    val password: String,
+    val remember: Boolean,
+)
+
 /** Ein Anmeldeverfahren. Mehrere pro Sprung sind erlaubt und werden der Reihe nach probiert. */
 sealed interface SshCredential {
 

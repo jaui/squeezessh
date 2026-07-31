@@ -1,6 +1,7 @@
 package dev.jaui.squeezessh.ui.terminal
 
 import android.content.ClipData
+import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.view.KeyEvent
 import androidx.compose.foundation.background
@@ -24,15 +25,21 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -49,10 +56,14 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.jaui.squeezessh.ssh.CredentialAnswer
 import dev.jaui.squeezessh.data.settings.BellMode
 import dev.jaui.squeezessh.data.settings.KeyboardPosition
 import dev.jaui.squeezessh.data.settings.TerminalSettings
@@ -60,6 +71,7 @@ import dev.jaui.squeezessh.terminal.TerminalFont
 import dev.jaui.squeezessh.terminal.TerminalTabs
 import dev.jaui.squeezessh.terminal.TerminalTheme
 import dev.jaui.squeezessh.terminal.TerminalView
+import kotlinx.coroutines.delay
 
 @Composable
 fun TerminalScreen(
@@ -85,6 +97,38 @@ fun TerminalScreen(
     var controlActive by remember { mutableStateOf(false) }
     var altActive by remember { mutableStateOf(false) }
     var selectedText by remember { mutableStateOf<String?>(null) }
+
+    val clipboard = remember(context) { context.getSystemService(ClipboardManager::class.java) }
+
+    // Ob die Zwischenablage Text traegt, entscheidet ueber die Einfuegen-Taste.
+    //
+    // Ab Android 10 beantwortet das System diese Frage nur der App im Vordergrund. Der
+    // Zustand wird deshalb nicht einmalig gelesen, sondern bei jeder Aenderung neu — und
+    // beim Anmelden des Beobachters, damit auch das stimmt, was schon vorher kopiert wurde.
+    var clipboardHasText by remember { mutableStateOf(false) }
+    DisposableEffect(clipboard) {
+        val manager = clipboard ?: return@DisposableEffect onDispose {}
+        fun refresh() {
+            clipboardHasText = runCatching {
+                manager.hasPrimaryClip() &&
+                    manager.primaryClipDescription?.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) == true
+            }.getOrDefault(false)
+        }
+        refresh()
+        val listener = ClipboardManager.OnPrimaryClipChangedListener(::refresh)
+        manager.addPrimaryClipChangedListener(listener)
+        onDispose { manager.removePrimaryClipChangedListener(listener) }
+    }
+
+    /** Der Inhalt der Zwischenablage als Text, oder `null` wenn nichts Brauchbares darin steht. */
+    fun clipboardText(): String? = runCatching {
+        clipboard?.primaryClip?.takeIf { it.itemCount > 0 }
+            ?.getItemAt(0)?.coerceToText(context)?.toString()
+    }.getOrNull()?.takeIf { it.isNotEmpty() }
+
+    fun pasteFromClipboard() {
+        clipboardText()?.let { terminalView?.sendText(it) }
+    }
 
     // Ein per Navigation mitgegebenes Ziel wird genau einmal geoeffnet.
     //
@@ -145,6 +189,8 @@ fun TerminalScreen(
                     controlActive = false
                     altActive = false
                 },
+                canPaste = clipboardHasText,
+                onPaste = ::pasteFromClipboard,
             )
         }
 
@@ -210,7 +256,12 @@ fun TerminalScreen(
                             ?.setPrimaryClip(ClipData.newPlainText("Terminal", text))
                         terminalView?.clearSelection()
                     },
-                    onPaste = { terminalView?.sendText(text) },
+                    onSend = { terminalView?.sendText(text) },
+                    canPaste = clipboardHasText,
+                    onPaste = {
+                        pasteFromClipboard()
+                        terminalView?.clearSelection()
+                    },
                     onDismiss = { terminalView?.clearSelection() },
                 )
             }
@@ -246,6 +297,8 @@ fun TerminalScreen(
                     controlActive = false
                     altActive = false
                 },
+                canPaste = clipboardHasText,
+                onPaste = ::pasteFromClipboard,
             )
         }
     }
@@ -253,6 +306,82 @@ fun TerminalScreen(
     state.hostKeyRequest?.let { request ->
         HostKeyDialog(request = request, onAnswer = viewModel::answerHostKey)
     }
+
+    state.credentialRequest?.let { request ->
+        CredentialDialog(request = request, onAnswer = viewModel::answerCredentials)
+    }
+}
+
+/**
+ * Fragt das Passwort ab, wenn zur Identitaet noch keines hinterlegt ist.
+ *
+ * Das Merken ist vorausgewaehlt: wer eine Verbindung als `nutzer@host` anlegt, will beim
+ * naechsten Mal nicht wieder gefragt werden. Wer das nicht will, kann es abwaehlen — dann
+ * gilt die Eingabe nur fuer diesen einen Verbindungsaufbau.
+ */
+@Composable
+private fun CredentialDialog(
+    request: CredentialRequest,
+    onAnswer: (CredentialAnswer?) -> Unit,
+) {
+    var password by remember { mutableStateOf("") }
+    var remember by remember { mutableStateOf(true) }
+    var visible by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = { onAnswer(null) },
+        title = { Text("Anmeldung bei ${request.prompt.host}") },
+        text = {
+            Column {
+                Text(
+                    "Für ${request.prompt.username} ist noch kein Passwort hinterlegt.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Passwort") },
+                    singleLine = true,
+                    visualTransformation = if (visible) {
+                        VisualTransformation.None
+                    } else {
+                        PasswordVisualTransformation()
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    trailingIcon = {
+                        IconButton(onClick = { visible = !visible }) {
+                            Icon(
+                                if (visible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = if (visible) "Verbergen" else "Anzeigen",
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { remember = !remember }
+                        .padding(top = 4.dp),
+                ) {
+                    Checkbox(checked = remember, onCheckedChange = { remember = it })
+                    Text("Bei der Identität speichern", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onAnswer(CredentialAnswer(password, remember)) },
+                enabled = password.isNotEmpty(),
+            ) {
+                Text("Anmelden")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { onAnswer(null) }) { Text("Abbrechen") }
+        },
+    )
 }
 
 /**
@@ -435,6 +564,8 @@ private fun SelectionBar(
     modifier: Modifier = Modifier,
     characters: Int,
     onCopy: () -> Unit,
+    onSend: () -> Unit,
+    canPaste: Boolean,
     onPaste: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -442,6 +573,7 @@ private fun SelectionBar(
         modifier = modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.secondaryContainer)
+            .horizontalScroll(rememberScrollState())
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -451,9 +583,17 @@ private fun SelectionBar(
             Icon(Icons.Default.ContentCopy, contentDescription = null, Modifier.size(16.dp))
             Text(" Kopieren")
         }
-        // „Senden" schickt die Auswahl zurueck in die Shell — praktisch, um einen
-        // ausgegebenen Pfad direkt weiterzuverwenden.
-        TextButton(onClick = onPaste) { Text("Senden") }
+        // „Einfuegen" und „Senden" sind zwei verschiedene Dinge, die hier leicht zu
+        // verwechseln waeren: „Einfuegen" schickt die Zwischenablage in die Shell,
+        // „Senden" die Markierung — praktisch, um einen ausgegebenen Pfad
+        // weiterzuverwenden, ohne den Umweg ueber die Ablage zu gehen.
+        if (canPaste) {
+            TextButton(onClick = onPaste) {
+                Icon(Icons.Default.ContentPaste, contentDescription = null, Modifier.size(16.dp))
+                Text(" Einfügen")
+            }
+        }
+        TextButton(onClick = onSend) { Text("Senden") }
         TextButton(onClick = onDismiss) { Text("Abbrechen") }
     }
 }
@@ -477,8 +617,21 @@ private fun ConnectingIndicator(status: String?) {
     }
 }
 
+/**
+ * Was zu sehen ist, wenn keine Sitzung offen ist — und zwar nur kurz.
+ *
+ * Ein leeres schwarzes Terminal ist kein Ort, an dem man etwas tun kann; nach zwei Sekunden
+ * geht es deshalb von selbst zurueck zur Uebersicht. Die Wartezeit ist bewusst nicht kuerzer:
+ * beim Oeffnen einer Verbindung ist dieser Zustand fuer wenige Bilder ebenfalls erreicht,
+ * bevor der Aufbau meldet, dass er laeuft. Ein sofortiger Ruecksprung wuerde genau die
+ * Navigation abbrechen, die gerade begonnen hat.
+ */
 @Composable
 private fun NoSessions(onBack: () -> Unit) {
+    LaunchedEffect(Unit) {
+        delay(AUTO_RETURN_MILLIS)
+        onBack()
+    }
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center,
@@ -490,6 +643,8 @@ private fun NoSessions(onBack: () -> Unit) {
         }
     }
 }
+
+private const val AUTO_RETURN_MILLIS = 2_000L
 
 @Composable
 private fun ConnectionFailed(error: String?, onBack: () -> Unit, onDismiss: () -> Unit) {
@@ -543,6 +698,9 @@ private fun ExtraKeysRow(
     onAltToggle: () -> Unit,
     onKey: (Int) -> Unit,
     onText: (String) -> Unit,
+    /** Steuert, ob die Einfuegen-Taste erscheint: ohne Text in der Ablage waere sie wirkungslos. */
+    canPaste: Boolean = false,
+    onPaste: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier
@@ -563,6 +721,14 @@ private fun ExtraKeysRow(
             onClick = onAltToggle,
             label = { Text("ALT", fontFamily = FontFamily.Monospace) },
         )
+        // Nur sichtbar, wenn es etwas einzufuegen gibt. Eine dauerhaft sichtbare Taste, die
+        // meistens nichts tut, waere in einer Leiste dieser Breite verschenkter Platz.
+        if (canPaste) {
+            TextButton(onClick = onPaste) {
+                Icon(Icons.Default.ContentPaste, contentDescription = null, Modifier.size(16.dp))
+                Text(" Einfügen", style = MaterialTheme.typography.labelLarge)
+            }
+        }
         KeyChip("ESC") { onKey(KeyEvent.KEYCODE_ESCAPE) }
         KeyChip("TAB") { onKey(KeyEvent.KEYCODE_TAB) }
         KeyChip("←") { onKey(KeyEvent.KEYCODE_DPAD_LEFT) }

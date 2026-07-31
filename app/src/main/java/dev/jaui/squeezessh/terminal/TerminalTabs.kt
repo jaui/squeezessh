@@ -1,6 +1,8 @@
 package dev.jaui.squeezessh.terminal
 
 import android.content.Context
+import dev.jaui.squeezessh.ssh.CredentialAnswer
+import dev.jaui.squeezessh.ssh.CredentialPrompt
 import dev.jaui.squeezessh.ssh.HostKeyPrompt
 import dev.jaui.squeezessh.ssh.SshConnectionState
 import dev.jaui.squeezessh.ssh.SshSession
@@ -94,6 +96,7 @@ class TerminalTabs @Inject constructor(
         connectionId: Long,
         onHostKey: suspend (HostKeyPrompt) -> Boolean,
         onProgress: (SshConnectionState) -> Unit = {},
+        onCredentials: suspend (CredentialPrompt) -> CredentialAnswer? = { null },
     ): Tab {
         // Der TERM-Typ muss beim Oeffnen des PTY feststehen — spaeter aendern liesse er
         // sich nur durch eine neue Sitzung.
@@ -103,6 +106,7 @@ class TerminalTabs @Inject constructor(
             terminalType = terminalSettings.terminalType,
             onHostKey = onHostKey,
             onProgress = onProgress,
+            onCredentials = onCredentials,
         )
 
         lateinit var tab: Tab

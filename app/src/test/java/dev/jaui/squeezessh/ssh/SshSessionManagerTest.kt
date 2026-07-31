@@ -99,6 +99,114 @@ class SshSessionManagerTest : DatabaseTestCase() {
         }
     }
 
+    /**
+     * Eine Identitaet ohne Geheimnis entsteht regulaer aus `nutzer@host`. Das Passwort muss
+     * dann beim ersten Anmelden erfragt werden — und danach gespeichert sein, sonst fragt
+     * die App bei jedem Verbinden erneut.
+     */
+    @Test
+    fun `fragt fehlende Zugangsdaten ab und merkt sie sich`() = runTest {
+        val identityId = identities.create(nickname = null, username = TestSshd.PASSWORD_USER)
+        val connectionId = connections.create(
+            ConnectionEntity(
+                nickname = "Ohne Passwort",
+                address = TestSshd.HOST,
+                port = TestSshd.TARGET_PORT,
+                createdAt = 0,
+                updatedAt = 0,
+            ),
+        )
+        connections.setIdentities(connectionId, listOf(identityId))
+
+        var asked: CredentialPrompt? = null
+        val session = manager.open(
+            connectionId,
+            onHostKey = acceptAll,
+            onCredentials = { prompt ->
+                asked = prompt
+                CredentialAnswer(TestSshd.PASSWORD, remember = true)
+            },
+        )
+
+        try {
+            assertThat(asked?.username).isEqualTo(TestSshd.PASSWORD_USER)
+            assertThat(asked?.host).isEqualTo(TestSshd.HOST)
+            assertThat(asked?.port).isEqualTo(TestSshd.TARGET_PORT)
+            assertThat(session.isAlive).isTrue()
+        } finally {
+            manager.close(session.id)
+        }
+
+        val stored = identities.findById(identityId)!!
+        assertThat(identities.revealPassword(stored)).isEqualTo(TestSshd.PASSWORD)
+    }
+
+    /** Ohne „merken" darf nichts in der Datenbank landen — die Eingabe galt nur einmal. */
+    @Test
+    fun `behaelt abgefragte Zugangsdaten ohne merken nicht`() = runTest {
+        val identityId = identities.create(nickname = null, username = TestSshd.PASSWORD_USER)
+        val connectionId = connections.create(
+            ConnectionEntity(
+                nickname = "Ohne Passwort",
+                address = TestSshd.HOST,
+                port = TestSshd.TARGET_PORT,
+                createdAt = 0,
+                updatedAt = 0,
+            ),
+        )
+        connections.setIdentities(connectionId, listOf(identityId))
+
+        val session = manager.open(
+            connectionId,
+            onHostKey = acceptAll,
+            onCredentials = { CredentialAnswer(TestSshd.PASSWORD, remember = false) },
+        )
+        manager.close(session.id)
+
+        assertThat(identities.revealPassword(identities.findById(identityId)!!)).isNull()
+    }
+
+    /** Wer die Abfrage abbricht, bekommt keine Verbindung — und keine halbe. */
+    @Test
+    fun `bricht ab wenn die Abfrage abgelehnt wird`() = runTest {
+        val identityId = identities.create(nickname = null, username = TestSshd.PASSWORD_USER)
+        val connectionId = connections.create(
+            ConnectionEntity(
+                nickname = "Ohne Passwort",
+                address = TestSshd.HOST,
+                port = TestSshd.TARGET_PORT,
+                createdAt = 0,
+                updatedAt = 0,
+            ),
+        )
+        connections.setIdentities(connectionId, listOf(identityId))
+
+        val failure = runCatching {
+            manager.open(connectionId, onHostKey = acceptAll, onCredentials = { null })
+        }.exceptionOrNull()
+
+        assertThat(failure).isInstanceOf(SshException::class.java)
+        assertThat((failure as SshException).error)
+            .isInstanceOf(SshError.AuthenticationFailed::class.java)
+        assertThat(manager.openSessions.value).isEmpty()
+    }
+
+    /** Sind Zugangsdaten hinterlegt, darf niemand gefragt werden. */
+    @Test
+    fun `fragt nicht wenn Zugangsdaten hinterlegt sind`() = runTest {
+        val connectionId = storeTarget()
+
+        var asked = false
+        val session = manager.open(
+            connectionId,
+            onHostKey = acceptAll,
+            onCredentials = { asked = true; null },
+        )
+        manager.close(session.id)
+
+        assertThat(asked).isFalse()
+    }
+
     @Test
     fun `zaehlt die Nutzung der Verbindung hoch`() = runTest {
         val connectionId = storeTarget()
