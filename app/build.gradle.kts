@@ -1,5 +1,6 @@
 // Innerhalb des Gradle-Kotlin-DSL verdeckt die `java`-Extension das Paket `java`,
 // java.util.Properties laesst sich deshalb nicht voll qualifiziert ansprechen.
+import com.android.build.api.variant.BuildConfigField
 import java.util.Properties
 
 plugins {
@@ -26,6 +27,15 @@ val APP_VERSION_CODE = APP_VERSION_NAME.split(".").map(String::toInt)
  * Fehlt die Datei — auf einem frischen Klon der Normalfall —, bleibt der Release-Build
  * unsigniert, statt fehlzuschlagen. Bauen und Debuggen kann dann trotzdem jeder.
  */
+/** Namensraum der Plugin-API. Ausgeschrieben nur hier — siehe [pluginApiPackage]. */
+val PLUGIN_API_PACKAGE = "dev.jaui.squeezessh"
+
+/** Der fremde Namensraum, den JuiceSSH-Plugins suchen. Nicht unserer, also unveraenderlich. */
+val PLUGIN_API_PACKAGE_COMPAT = "com.sonelli.juicessh"
+
+/** Haelt Debug- und Release-Build auseinander, damit beide nebeneinander installierbar sind. */
+val PLUGIN_API_DEBUG_SUFFIX = ".debug"
+
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties().apply {
     if (keystorePropertiesFile.exists()) {
@@ -45,6 +55,16 @@ android {
         versionName = APP_VERSION_NAME
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Der Namensraum der Plugin-API fuer das Manifest von "standalone". Bewusst ueber
+        // die DSL und nicht ueber die Variant-API: nur so erreichen die Werte auch den
+        // Manifest-Merge der Unit-Tests, der sonst mit „no value provided" abbricht.
+        //
+        // Das Manifest von "juicesshcompat" benutzt diese Platzhalter nicht — es schreibt
+        // den fremden JuiceSSH-Namensraum aus. Der `debug`-Block unten kann sie deshalb
+        // gefahrlos ueberschreiben, ohne diese Variante zu beruehren.
+        manifestPlaceholders["pluginApiPackage"] = PLUGIN_API_PACKAGE
+        manifestPlaceholders["pluginApiAuthority"] = "$PLUGIN_API_PACKAGE.api.v1"
     }
 
     signingConfigs {
@@ -68,22 +88,10 @@ android {
         create("standalone") {
             dimension = "pluginApi"
             isDefault = true
-            manifestPlaceholders["pluginApiAuthority"] = "dev.jaui.squeezessh.api.v1"
-            buildConfigField(
-                "String",
-                "PLUGIN_API_AUTHORITY",
-                "\"dev.jaui.squeezessh.api.v1\"",
-            )
         }
         create("juicesshcompat") {
             dimension = "pluginApi"
             versionNameSuffix = "-juicesshcompat"
-            manifestPlaceholders["pluginApiAuthority"] = "com.sonelli.juicessh.api.v1"
-            buildConfigField(
-                "String",
-                "PLUGIN_API_AUTHORITY",
-                "\"com.sonelli.juicessh.api.v1\"",
-            )
         }
     }
 
@@ -91,6 +99,15 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             isMinifyEnabled = false
+
+            // Passend zum applicationIdSuffix: Permissions, Permission-Gruppen und
+            // Provider-Authorities fuehrt Android geraeteweit, jeder Name gehoert genau
+            // einem Paket. Ohne diesen Suffix liesse sich der Release-Build nicht neben
+            // dem Debug-Build installieren — der zweite scheiterte an DUPLICATE_PERMISSION.
+            manifestPlaceholders["pluginApiPackage"] =
+                PLUGIN_API_PACKAGE + PLUGIN_API_DEBUG_SUFFIX
+            manifestPlaceholders["pluginApiAuthority"] =
+                "$PLUGIN_API_PACKAGE$PLUGIN_API_DEBUG_SUFFIX.api.v1"
         }
         release {
             isMinifyEnabled = true
@@ -145,6 +162,57 @@ android {
         unitTests {
             isIncludeAndroidResources = true
         }
+    }
+}
+
+/**
+ * Der Namensraum der Plugin-API, an einer Stelle festgelegt.
+ *
+ * Er steckt in der Provider-Authority, in elf Permission-Namen, in der Permission-Gruppe und
+ * in den Intent-Actions der Dienste. Frueher stand er in beiden Varianten-Manifesten
+ * ausgeschrieben; die `manifestPlaceholders`, die es dafuer schon gab, waren gesetzt, aber
+ * von keinem Manifest benutzt.
+ *
+ * Der Debug-Suffix gehoert dazu, weil Android Permissions, Permission-Gruppen und
+ * Provider-Authorities **geraeteweit** fuehrt: jeder Name gehoert genau einem Paket.
+ * `applicationIdSuffix = ".debug"` aendert nur die applicationId, nicht diese Namen — Debug-
+ * und Release-Build derselben Variante liessen sich deshalb nicht nebeneinander
+ * installieren, der zweite scheiterte mit DUPLICATE_PERMISSION.
+ *
+ * Fuer `juicesshcompat` gilt das ausdruecklich **nicht**: fremde JuiceSSH-Plugins suchen
+ * exakt `com.sonelli.juicessh.api.v1`, ein Suffix daran macht sie blind. Diese Variante
+ * bleibt deshalb auf einen installierten Build beschraenkt — sie wird ohnehin nicht
+ * ausgeliefert und ist ein Testwerkzeug.
+ */
+fun pluginApiPackage(flavorName: String?, buildTypeName: String?): String = when (flavorName) {
+    "juicesshcompat" -> PLUGIN_API_PACKAGE_COMPAT
+    else -> PLUGIN_API_PACKAGE + if (buildTypeName == "debug") PLUGIN_API_DEBUG_SUFFIX else ""
+}
+
+/**
+ * `BuildConfig.PLUGIN_API_AUTHORITY` muss dasselbe sagen wie das Manifest.
+ *
+ * Die Platzhalter dafuer stehen in der DSL oben, dieses Feld hier: die DSL kennt Variante und
+ * Build-Typ nicht gemeinsam — ein `buildConfigField` im `debug`-Block ueberschriebe auch das
+ * von `juicesshcompat` und haenge dessen Plugins ab. Die Variant-API kennt beides, erreicht
+ * dafuer aber den Manifest-Merge der Unit-Tests nicht. Deshalb der Umweg ueber zwei Wege mit
+ * einer gemeinsamen Quelle in [pluginApiPackage].
+ */
+androidComponents {
+    onVariants { variant ->
+        val authority = pluginApiPackage(variant.flavorName, variant.buildType) + ".api.v1"
+
+        // Nullable, weil es ohne `buildFeatures.buildConfig` kein BuildConfig gibt. Hier
+        // waere das kein Schoenheitsfehler, sondern der Ausfall der Plugin-API:
+        // PluginContract leitet Authority, Permission-Namen und MIME-Typen daraus ab.
+        val buildConfigFields = requireNotNull(variant.buildConfigFields) {
+            "buildFeatures.buildConfig muss eingeschaltet bleiben, PluginContract braucht " +
+                "PLUGIN_API_AUTHORITY"
+        }
+        buildConfigFields.put(
+            "PLUGIN_API_AUTHORITY",
+            BuildConfigField("String", "\"$authority\"", "Namensraum der Plugin-API"),
+        )
     }
 }
 

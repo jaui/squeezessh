@@ -7,77 +7,82 @@
   INSTALL_FAILED_CONFLICTING_PROVIDER, gleiche Permission-Namen zu DUPLICATE_PERMISSION.
   Diese Variante benutzt eigene Namen und laesst sich neben JuiceSSH installieren;
   bestehende Plugins finden sie aber nicht.
+
+  Die Namen kommen aus `pluginApiAuthority` und `pluginApiPackage`, gesetzt in
+  app/build.gradle.kts. Der Debug-Build bekommt dort ein `.debug` in den Namensraum —
+  ohne das gehoerten die Permission-Namen geraeteweit dem zuerst installierten der beiden
+  Builds, und der zweite liesse sich nicht danebenstellen.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <permission-group
-        android:name="dev.jaui.squeezessh.api.v1.permission-group.PLUGIN_API"
+        android:name="${pluginApiAuthority}.permission-group.PLUGIN_API"
         android:description="@string/permission_group_plugin_api_description"
         android:label="@string/permission_group_plugin_api" />
 
     <permission
-        android:name="dev.jaui.squeezessh.api.v1.permission.READ_CONNECTIONS"
-        android:permissionGroup="dev.jaui.squeezessh.api.v1.permission-group.PLUGIN_API"
+        android:name="${pluginApiAuthority}.permission.READ_CONNECTIONS"
+        android:permissionGroup="${pluginApiAuthority}.permission-group.PLUGIN_API"
         android:protectionLevel="dangerous"
         android:description="@string/permission_read_connections_description"
         android:label="@string/permission_read_connections" />
     <permission
-        android:name="dev.jaui.squeezessh.api.v1.permission.WRITE_CONNECTIONS"
-        android:permissionGroup="dev.jaui.squeezessh.api.v1.permission-group.PLUGIN_API"
+        android:name="${pluginApiAuthority}.permission.WRITE_CONNECTIONS"
+        android:permissionGroup="${pluginApiAuthority}.permission-group.PLUGIN_API"
         android:protectionLevel="dangerous"
         android:description="@string/permission_write_connections_description"
         android:label="@string/permission_write_connections" />
     <permission
-        android:name="dev.jaui.squeezessh.api.v1.permission.READ_CONNECTION_GROUPS"
-        android:permissionGroup="dev.jaui.squeezessh.api.v1.permission-group.PLUGIN_API"
+        android:name="${pluginApiAuthority}.permission.READ_CONNECTION_GROUPS"
+        android:permissionGroup="${pluginApiAuthority}.permission-group.PLUGIN_API"
         android:protectionLevel="dangerous"
         android:description="@string/permission_read_connection_groups_description"
         android:label="@string/permission_read_connection_groups" />
     <permission
-        android:name="dev.jaui.squeezessh.api.v1.permission.WRITE_CONNECTION_GROUPS"
-        android:permissionGroup="dev.jaui.squeezessh.api.v1.permission-group.PLUGIN_API"
+        android:name="${pluginApiAuthority}.permission.WRITE_CONNECTION_GROUPS"
+        android:permissionGroup="${pluginApiAuthority}.permission-group.PLUGIN_API"
         android:protectionLevel="dangerous"
         android:description="@string/permission_write_connection_groups_description"
         android:label="@string/permission_write_connection_groups" />
     <permission
-        android:name="dev.jaui.squeezessh.api.v1.permission.READ_PORT_FORWARDS"
-        android:permissionGroup="dev.jaui.squeezessh.api.v1.permission-group.PLUGIN_API"
+        android:name="${pluginApiAuthority}.permission.READ_PORT_FORWARDS"
+        android:permissionGroup="${pluginApiAuthority}.permission-group.PLUGIN_API"
         android:protectionLevel="dangerous"
         android:description="@string/permission_read_port_forwards_description"
         android:label="@string/permission_read_port_forwards" />
     <permission
-        android:name="dev.jaui.squeezessh.api.v1.permission.WRITE_PORT_FORWARDS"
-        android:permissionGroup="dev.jaui.squeezessh.api.v1.permission-group.PLUGIN_API"
+        android:name="${pluginApiAuthority}.permission.WRITE_PORT_FORWARDS"
+        android:permissionGroup="${pluginApiAuthority}.permission-group.PLUGIN_API"
         android:protectionLevel="dangerous"
         android:description="@string/permission_write_port_forwards_description"
         android:label="@string/permission_write_port_forwards" />
     <permission
-        android:name="dev.jaui.squeezessh.api.v1.permission.READ_SNIPPETS"
-        android:permissionGroup="dev.jaui.squeezessh.api.v1.permission-group.PLUGIN_API"
+        android:name="${pluginApiAuthority}.permission.READ_SNIPPETS"
+        android:permissionGroup="${pluginApiAuthority}.permission-group.PLUGIN_API"
         android:protectionLevel="dangerous"
         android:description="@string/permission_read_snippets_description"
         android:label="@string/permission_read_snippets" />
     <permission
-        android:name="dev.jaui.squeezessh.api.v1.permission.WRITE_SNIPPETS"
-        android:permissionGroup="dev.jaui.squeezessh.api.v1.permission-group.PLUGIN_API"
+        android:name="${pluginApiAuthority}.permission.WRITE_SNIPPETS"
+        android:permissionGroup="${pluginApiAuthority}.permission-group.PLUGIN_API"
         android:protectionLevel="dangerous"
         android:description="@string/permission_write_snippets_description"
         android:label="@string/permission_write_snippets" />
     <permission
-        android:name="dev.jaui.squeezessh.api.v1.permission.READ_PLUGIN_LOG"
-        android:permissionGroup="dev.jaui.squeezessh.api.v1.permission-group.PLUGIN_API"
+        android:name="${pluginApiAuthority}.permission.READ_PLUGIN_LOG"
+        android:permissionGroup="${pluginApiAuthority}.permission-group.PLUGIN_API"
         android:protectionLevel="dangerous"
         android:description="@string/permission_read_plugin_log_description"
         android:label="@string/permission_read_plugin_log" />
     <permission
-        android:name="dev.jaui.squeezessh.api.v1.permission.OPEN_SESSIONS"
-        android:permissionGroup="dev.jaui.squeezessh.api.v1.permission-group.PLUGIN_API"
+        android:name="${pluginApiAuthority}.permission.OPEN_SESSIONS"
+        android:permissionGroup="${pluginApiAuthority}.permission-group.PLUGIN_API"
         android:protectionLevel="dangerous"
         android:description="@string/permission_open_sessions_description"
         android:label="@string/permission_open_sessions" />
     <permission
-        android:name="dev.jaui.squeezessh.api.v1.permission.OPEN_SFTP_SESSIONS"
-        android:permissionGroup="dev.jaui.squeezessh.api.v1.permission-group.PLUGIN_API"
+        android:name="${pluginApiAuthority}.permission.OPEN_SFTP_SESSIONS"
+        android:permissionGroup="${pluginApiAuthority}.permission-group.PLUGIN_API"
         android:protectionLevel="dangerous"
         android:description="@string/permission_open_sftp_sessions_description"
         android:label="@string/permission_open_sftp_sessions" />
@@ -90,49 +95,49 @@
         -->
         <provider
             android:name="dev.jaui.squeezessh.pluginapi.PluginProvider"
-            android:authorities="dev.jaui.squeezessh.api.v1"
+            android:authorities="${pluginApiAuthority}"
             android:exported="true"
             android:grantUriPermissions="false">
             <path-permission
                 android:path="/connections"
-                android:readPermission="dev.jaui.squeezessh.api.v1.permission.READ_CONNECTIONS"
-                android:writePermission="dev.jaui.squeezessh.api.v1.permission.WRITE_CONNECTIONS" />
+                android:readPermission="${pluginApiAuthority}.permission.READ_CONNECTIONS"
+                android:writePermission="${pluginApiAuthority}.permission.WRITE_CONNECTIONS" />
             <path-permission
                 android:pathPrefix="/connections/"
-                android:readPermission="dev.jaui.squeezessh.api.v1.permission.READ_CONNECTIONS"
-                android:writePermission="dev.jaui.squeezessh.api.v1.permission.WRITE_CONNECTIONS" />
+                android:readPermission="${pluginApiAuthority}.permission.READ_CONNECTIONS"
+                android:writePermission="${pluginApiAuthority}.permission.WRITE_CONNECTIONS" />
             <path-permission
                 android:path="/connectiongroups"
-                android:readPermission="dev.jaui.squeezessh.api.v1.permission.READ_CONNECTION_GROUPS"
-                android:writePermission="dev.jaui.squeezessh.api.v1.permission.WRITE_CONNECTION_GROUPS" />
+                android:readPermission="${pluginApiAuthority}.permission.READ_CONNECTION_GROUPS"
+                android:writePermission="${pluginApiAuthority}.permission.WRITE_CONNECTION_GROUPS" />
             <path-permission
                 android:pathPrefix="/connectiongroups/"
-                android:readPermission="dev.jaui.squeezessh.api.v1.permission.READ_CONNECTION_GROUPS"
-                android:writePermission="dev.jaui.squeezessh.api.v1.permission.WRITE_CONNECTION_GROUPS" />
+                android:readPermission="${pluginApiAuthority}.permission.READ_CONNECTION_GROUPS"
+                android:writePermission="${pluginApiAuthority}.permission.WRITE_CONNECTION_GROUPS" />
             <path-permission
                 android:path="/connectiongroupmemberships"
-                android:readPermission="dev.jaui.squeezessh.api.v1.permission.READ_CONNECTION_GROUPS"
-                android:writePermission="dev.jaui.squeezessh.api.v1.permission.WRITE_CONNECTION_GROUPS" />
+                android:readPermission="${pluginApiAuthority}.permission.READ_CONNECTION_GROUPS"
+                android:writePermission="${pluginApiAuthority}.permission.WRITE_CONNECTION_GROUPS" />
             <path-permission
                 android:path="/portforwards"
-                android:readPermission="dev.jaui.squeezessh.api.v1.permission.READ_PORT_FORWARDS"
-                android:writePermission="dev.jaui.squeezessh.api.v1.permission.WRITE_PORT_FORWARDS" />
+                android:readPermission="${pluginApiAuthority}.permission.READ_PORT_FORWARDS"
+                android:writePermission="${pluginApiAuthority}.permission.WRITE_PORT_FORWARDS" />
             <path-permission
                 android:pathPrefix="/portforwards/"
-                android:readPermission="dev.jaui.squeezessh.api.v1.permission.READ_PORT_FORWARDS"
-                android:writePermission="dev.jaui.squeezessh.api.v1.permission.WRITE_PORT_FORWARDS" />
+                android:readPermission="${pluginApiAuthority}.permission.READ_PORT_FORWARDS"
+                android:writePermission="${pluginApiAuthority}.permission.WRITE_PORT_FORWARDS" />
             <path-permission
                 android:path="/snippets"
-                android:readPermission="dev.jaui.squeezessh.api.v1.permission.READ_SNIPPETS"
-                android:writePermission="dev.jaui.squeezessh.api.v1.permission.WRITE_SNIPPETS" />
+                android:readPermission="${pluginApiAuthority}.permission.READ_SNIPPETS"
+                android:writePermission="${pluginApiAuthority}.permission.WRITE_SNIPPETS" />
             <path-permission
                 android:pathPrefix="/snippets/"
-                android:readPermission="dev.jaui.squeezessh.api.v1.permission.READ_SNIPPETS"
-                android:writePermission="dev.jaui.squeezessh.api.v1.permission.WRITE_SNIPPETS" />
+                android:readPermission="${pluginApiAuthority}.permission.READ_SNIPPETS"
+                android:writePermission="${pluginApiAuthority}.permission.WRITE_SNIPPETS" />
             <!-- Der Pruefpfad ist nur lesbar; ein Schreibrecht gibt es dafuer nicht. -->
             <path-permission
                 android:path="/pluginlog"
-                android:readPermission="dev.jaui.squeezessh.api.v1.permission.READ_PLUGIN_LOG" />
+                android:readPermission="${pluginApiAuthority}.permission.READ_PLUGIN_LOG" />
         </provider>
 
         <!--
@@ -150,27 +155,27 @@
         <service
             android:name="dev.jaui.squeezessh.pluginapi.PluginService"
             android:exported="true"
-            android:permission="dev.jaui.squeezessh.api.v1.permission.OPEN_SESSIONS">
+            android:permission="${pluginApiAuthority}.permission.OPEN_SESSIONS">
             <intent-filter>
-                <action android:name="dev.jaui.squeezessh.pluginservice" />
+                <action android:name="${pluginApiPackage}.pluginservice" />
             </intent-filter>
         </service>
 
         <service
             android:name="dev.jaui.squeezessh.pluginapi.ConnectionPluginService"
             android:exported="true"
-            android:permission="dev.jaui.squeezessh.api.v1.permission.OPEN_SESSIONS">
+            android:permission="${pluginApiAuthority}.permission.OPEN_SESSIONS">
             <intent-filter>
-                <action android:name="dev.jaui.squeezessh.connectionpluginservice" />
+                <action android:name="${pluginApiPackage}.connectionpluginservice" />
             </intent-filter>
         </service>
 
         <service
             android:name="dev.jaui.squeezessh.pluginapi.SftpPluginService"
             android:exported="true"
-            android:permission="dev.jaui.squeezessh.api.v1.permission.OPEN_SFTP_SESSIONS">
+            android:permission="${pluginApiAuthority}.permission.OPEN_SFTP_SESSIONS">
             <intent-filter>
-                <action android:name="dev.jaui.squeezessh.sftppluginservice" />
+                <action android:name="${pluginApiPackage}.sftppluginservice" />
             </intent-filter>
         </service>
     </application>

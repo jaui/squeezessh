@@ -7,6 +7,12 @@
   INSTALL_FAILED_CONFLICTING_PROVIDER, gleiche Permission-Namen zu DUPLICATE_PERMISSION.
   Diese Variante benutzt die Namen von JuiceSSH, damit bestehende Plugins sie ohne
   Aenderung finden - dafuer laesst sie sich nicht neben JuiceSSH installieren.
+
+  Hier stehen die Namen absichtlich ausgeschrieben, waehrend "standalone" sie aus
+  Platzhaltern bezieht: sie sind kein Namensraum, ueber den wir verfuegen, sondern der
+  fremde, den die Plugins suchen. Insbesondere bekommt der Debug-Build hier **kein**
+  `.debug` - das machte genau die Plugins blind, fuer die es diese Variante gibt. Sie
+  bleibt deshalb auf einen installierten Build beschraenkt.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
