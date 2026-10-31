@@ -64,7 +64,7 @@ class PluginApiPathTest {
             "connections",
             "/connections/a b",
             "/connections/ä",
-            "/connections\x",
+            "/connections\\x",
             "/a/b/c",
         ).forEach { assertThat(isCanonicalApiPath(it)).isFalse() }
     }
