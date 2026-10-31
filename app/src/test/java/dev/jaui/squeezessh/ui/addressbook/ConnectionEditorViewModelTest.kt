@@ -16,8 +16,9 @@ import org.robolectric.RobolectricTestRunner
 
 /**
  * Wer `root@host` eintippt, hat den Benutzer bereits genannt. Ihn danach noch von Hand als
- * Identität anzulegen ist Doppelarbeit — diese Tests halten fest, dass sie entfällt, und
- * dass dabei kein zweiter Eintrag neben einem vorhandenen gleichen Namens entsteht.
+ * Identität anzulegen ist Doppelarbeit — diese Tests halten fest, dass sie entfällt. Und
+ * dass dabei nie eine vorhandene Identität samt Passwort von selbst an den Host gerät: der
+ * Name kann aus einem fremden `ssh://root@…`-Link stammen.
  */
 @RunWith(RobolectricTestRunner::class)
 class ConnectionEditorViewModelTest : DatabaseTestCase() {
@@ -75,19 +76,40 @@ class ConnectionEditorViewModelTest : DatabaseTestCase() {
     }
 
     @Test
-    fun `vorhandener Benutzer wird wiederverwendet statt verdoppelt`() = runTest {
+    fun `vorhandener Benutzer wird nur vorgeschlagen, nicht verknuepft`() = runTest {
         val existingId = identities.create(nickname = "Prod", username = "root")
+        identities.setPassword(existingId, "geheim")
 
         val viewModel = editor()
         viewModel.state.first { it.availableIdentities.isNotEmpty() }
         viewModel.onAddressChanged("root@db.example.com")
+        assertThat(viewModel.state.value.suggestedIdentities.map { it.id })
+            .containsExactly(existingId)
 
         assertThat(viewModel.save()).isTrue()
 
-        assertThat(identities.observeAll().first().map { it.id }).containsExactly(existingId)
         val connection = connections.observeAll().first().single()
-        assertThat(connections.identitiesFor(connection.id).map { it.id })
-            .containsExactly(existingId)
+        val linked = connections.identitiesFor(connection.id).single()
+        assertThat(linked.id).isNotEqualTo(existingId)
+        assertThat(linked.username).isEqualTo("root")
+        assertThat(identities.revealPassword(linked)).isNull()
+    }
+
+    @Test
+    fun `ein ssh-Link verknuepft keine vorhandene Identitaet samt Passwort`() = runTest {
+        val existingId = identities.create(nickname = "Prod", username = "root")
+        identities.setPassword(existingId, "geheim")
+
+        val viewModel = editor(prefill = "ssh://root@fremd.example.com")
+        viewModel.state.first { it.parsed != null && it.availableIdentities.isNotEmpty() }
+
+        assertThat(viewModel.save()).isTrue()
+
+        val connection = connections.observeAll().first().single()
+        val linked = connections.identitiesFor(connection.id)
+        assertThat(linked.map { it.id }).doesNotContain(existingId)
+        assertThat(linked.map { it.username }).containsExactly("root")
+        assertThat(identities.revealPassword(linked.single())).isNull()
     }
 
     @Test
@@ -98,9 +120,12 @@ class ConnectionEditorViewModelTest : DatabaseTestCase() {
         viewModel.state.first { it.availableIdentities.isNotEmpty() }
         viewModel.onAddressChanged("root@db.example.com")
         viewModel.onIdentityToggled(existingId)
+        assertThat(viewModel.state.value.addressUsernameSelected).isTrue()
+        assertThat(viewModel.state.value.suggestedIdentities).isEmpty()
 
         assertThat(viewModel.save()).isTrue()
 
+        assertThat(identities.observeAll().first().map { it.id }).containsExactly(existingId)
         val connection = connections.observeAll().first().single()
         assertThat(connections.identitiesFor(connection.id).map { it.id })
             .containsExactly(existingId)

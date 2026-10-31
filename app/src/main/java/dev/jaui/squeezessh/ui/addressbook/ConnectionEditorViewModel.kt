@@ -228,25 +228,20 @@ class ConnectionEditorViewModel @Inject constructor(
      * Doppelarbeit, die niemand will — der Name steht ja schon da. Angelegt wird sie ohne
      * Geheimnis; das Passwort fragt der Verbindungsaufbau beim ersten Anmelden ab.
      *
-     * Ein vorhandener Eintrag mit demselben Benutzernamen wird wiederverwendet, statt einen
-     * zweiten daneben zu stellen. Wurde die Identitaet bereits von Hand ausgewaehlt, passiert
-     * gar nichts: dann ist die Absicht schon ausgedrueckt.
+     * Eine vorhandene Identitaet gleichen Namens wird **nicht** von selbst verknuepft, auch
+     * keine ohne Geheimnis: der Benutzername kann aus einem fremden `ssh://root@…`-Link
+     * stammen, und das gespeicherte Passwort des eigenen Servers ginge dann an den fremden
+     * Host. Eine Identitaet ohne Geheimnis kann eines bekommen, sobald sie anderswo
+     * „Passwort merken“ erlebt. Wer die vorhandene will, waehlt sie aus — der Editor schlaegt
+     * sie vor ([ConnectionEditorState.suggestedIdentities]). Ist eine Identitaet mit diesem
+     * Namen bereits ausgewaehlt, passiert gar nichts: dann ist die Absicht schon ausgedrueckt.
      *
      * @return die zu verknuepfende Identitaet, oder leer wenn nichts zu tun ist.
      */
     private suspend fun identityForUsername(current: ConnectionEditorState): List<Long> {
         val username = current.addressUsername?.trim()?.takeIf { it.isNotEmpty() }
             ?: return emptyList()
-
-        val existing = identities.observeAll().first()
-            .firstOrNull { it.username.equals(username, ignoreCase = false) }
-        if (existing != null) {
-            return if (existing.id in current.selectedIdentityIds) {
-                emptyList()
-            } else {
-                listOf(existing.id)
-            }
-        }
+        if (current.addressUsernameSelected) return emptyList()
         return listOf(identities.create(nickname = null, username = username))
     }
 
@@ -269,7 +264,7 @@ data class ConnectionEditorState(
     val availableGroups: List<ConnectionGroupEntity> = emptyList(),
     val availableIdentities: List<IdentityEntity> = emptyList(),
     val possibleJumpHosts: List<ConnectionEntity> = emptyList(),
-    /** Aus einer Eingabe wie `root@host` mitgelesen — als Hinweis, welche Identitaet passt. */
+    /** Aus einem `ssh://`-Link mitgelesen — wird nur als neue, leere Identitaet angelegt. */
     val pendingUsername: String? = null,
     /** Was aus dem Adressfeld zu lesen ist; `null` heisst unbrauchbar. */
     val parsed: ConnectionTarget? = null,
@@ -278,14 +273,19 @@ data class ConnectionEditorState(
     val addressUsername: String? get() = parsed?.username ?: pendingUsername
 
     /**
-     * Ob zu diesem Benutzer schon eine Identitaet existiert.
-     *
-     * Entscheidet nur, was der Editor ankuendigt — verknuepft wird in beiden Faellen, neu
-     * angelegt nur im zweiten.
+     * Vorhandene Identitaeten mit dem Benutzernamen aus der Adresse, die noch nicht
+     * ausgewaehlt sind — nur ein Vorschlag. Verknuepft wird keine davon ohne ausdrueckliche
+     * Auswahl, siehe `identityForUsername`.
      */
-    val addressUsernameKnown: Boolean
+    val suggestedIdentities: List<IdentityEntity>
         get() = addressUsername?.trim()?.let { name ->
-            availableIdentities.any { it.username == name }
+            availableIdentities.filter { it.username == name && it.id !in selectedIdentityIds }
+        }.orEmpty()
+
+    /** Ob eine Identitaet mit dem Benutzernamen aus der Adresse bereits ausgewaehlt ist. */
+    val addressUsernameSelected: Boolean
+        get() = addressUsername?.trim()?.let { name ->
+            availableIdentities.any { it.username == name && it.id in selectedIdentityIds }
         } == true
 
     /** Was beim Speichern herauskaeme — als Rueckmeldung noch vor dem Speichern. */
