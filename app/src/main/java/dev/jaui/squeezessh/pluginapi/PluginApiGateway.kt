@@ -52,8 +52,43 @@ class PluginApiGateway @Inject constructor(
         addURI(authority, PluginContract.PluginLog.PATH, PLUGIN_LOG)
     }
 
+    /**
+     * Wie [UriMatcher.match], aber nur für Pfade in genau der Schreibweise, die der Vertrag
+     * kennt. `UriMatcher` überspringt leere Segmente, Androids `path-permission`-Prüfung
+     * vergleicht den Pfad dagegen wörtlich: `//connections` passte auf keine Regel im
+     * Manifest und landete hier trotzdem bei den Verbindungen. Siehe [isCanonicalApiPath].
+     */
+    private fun match(uri: Uri): Int =
+        if (isCanonicalApiPath(uri.encodedPath)) matcher.match(uri) else UriMatcher.NO_MATCH
+
+    /**
+     * Die Permission, die ein Zugriff auf [uri] verlangt — lesend oder schreibend.
+     *
+     * `null` heißt: kein Zugriff, für niemanden. Das gilt für Pfade außerhalb des Vertrags
+     * und für das Schreiben in den Prüfpfad.
+     */
+    fun requiredPermission(uri: Uri, write: Boolean): String? = when (match(uri)) {
+        CONNECTIONS, CONNECTION_ITEM -> PluginContract.Connections.run {
+            if (write) PERMISSION_WRITE else PERMISSION_READ
+        }
+        GROUPS, GROUP_ITEM -> PluginContract.ConnectionGroups.run {
+            if (write) PERMISSION_WRITE else PERMISSION_READ
+        }
+        MEMBERSHIPS -> PluginContract.ConnectionGroupMemberships.run {
+            if (write) PERMISSION_WRITE else PERMISSION_READ
+        }
+        PORT_FORWARDS, PORT_FORWARD_ITEM -> PluginContract.PortForwards.run {
+            if (write) PERMISSION_WRITE else PERMISSION_READ
+        }
+        SNIPPETS, SNIPPET_ITEM -> PluginContract.Snippets.run {
+            if (write) PERMISSION_WRITE else PERMISSION_READ
+        }
+        PLUGIN_LOG -> if (write) null else PluginContract.PluginLog.PERMISSION_READ
+        else -> null
+    }
+
     fun mimeTypeOf(uri: Uri): String? {
-        val match = matcher.match(uri)
+        val match = match(uri)
         val model = modelOf(match) ?: return null
         return if (isItem(match)) {
             PluginContract.itemMimeType(model)
@@ -65,7 +100,7 @@ class PluginApiGateway @Inject constructor(
     // --- Lesen --------------------------------------------------------------------------
 
     suspend fun query(uri: Uri, caller: String): Cursor? {
-        val match = matcher.match(uri)
+        val match = match(uri)
         if (match == UriMatcher.NO_MATCH) return null
 
         val cursor = when (match) {
@@ -94,7 +129,7 @@ class PluginApiGateway @Inject constructor(
     // --- Schreiben ----------------------------------------------------------------------
 
     suspend fun insert(uri: Uri, values: ContentValues?, caller: String): Uri? {
-        val match = matcher.match(uri)
+        val match = match(uri)
         if (match == PLUGIN_LOG) refuseAuditWrite()
         val content = values ?: return null
 
@@ -116,7 +151,7 @@ class PluginApiGateway @Inject constructor(
      * WHERE-Klausel wäre eine Einladung.
      */
     suspend fun update(uri: Uri, values: ContentValues?, caller: String): Int {
-        val match = matcher.match(uri)
+        val match = match(uri)
         if (match == PLUGIN_LOG) refuseAuditWrite()
         val content = values ?: return 0
 
@@ -132,7 +167,7 @@ class PluginApiGateway @Inject constructor(
     }
 
     suspend fun delete(uri: Uri, caller: String): Int {
-        val match = matcher.match(uri)
+        val match = match(uri)
         if (match == PLUGIN_LOG) refuseAuditWrite()
 
         val removed = when (match) {
@@ -454,6 +489,25 @@ class PluginApiGateway @Inject constructor(
         const val PLUGIN_LOG = 10
 
         const val PORT_MAX = 65535
+    }
+}
+
+/**
+ * Ob [encodedPath] in genau der Form vorliegt, die die Plugin-API kennt:
+ * `/<segment>` oder `/<segment>/<kennung>`, jedes Segment nicht leer und nur aus
+ * Buchstaben, Ziffern, `-`, `_` und `.`.
+ *
+ * Abgelehnt werden damit leere Segmente (`//connections`, `/connections/`), `.` und `..`
+ * sowie jede Prozent-Kodierung — auch ein kodierter Schrägstrich (`%2F`). Geprüft wird der
+ * rohe, nicht dekodierte Pfad; ohne `%` ist er mit dem dekodierten identisch, den Android
+ * gegen die `path-permission`-Regeln hält.
+ */
+internal fun isCanonicalApiPath(encodedPath: String?): Boolean {
+    if (encodedPath == null || !encodedPath.startsWith("/")) return false
+    val segments = encodedPath.substring(1).split("/")
+    return segments.size in 1..2 && segments.all { segment ->
+        segment.isNotEmpty() && segment != "." && segment != ".." &&
+            segment.all { it.isLetterOrDigit() && it.code < 128 || it in "-_." }
     }
 }
 

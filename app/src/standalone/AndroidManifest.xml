@@ -87,14 +87,28 @@
         android:description="@string/permission_open_sftp_sessions_description"
         android:label="@string/permission_open_sftp_sessions" />
 
+    <!--
+      Provider-weite Vorgabe fuer jeden Pfad, den keine path-permission erfasst. Kein Plugin
+      bekommt sie (signature), damit gilt: was keine Regel unten trifft, ist gesperrt. Ein
+      Plugin mit passender path-permission kommt trotzdem durch — Android prueft die
+      path-permission auch dann, wenn die Provider-Permission fehlt.
+    -->
+    <permission
+        android:name="${pluginApiAuthority}.permission.PROVIDER_DEFAULT"
+        android:protectionLevel="signature" />
+
     <application>
         <!--
           Nicht exportiert waere sinnlos: der Provider ist genau dafuer da, von anderen
           Apps gelesen zu werden. Der Zugriff haengt an den Permissions oben, jeder Pfad
-          einzeln.
+          einzeln. Die path-permission-Regeln vergleichen den Pfad woertlich (`//connections`
+          traefe keine), deshalb die Vorgabe PROVIDER_DEFAULT fuer den Rest und eine zweite
+          Pruefung derselben Rechte in PluginProvider.
         -->
         <provider
             android:name="dev.jaui.squeezessh.pluginapi.PluginProvider"
+            android:readPermission="${pluginApiAuthority}.permission.PROVIDER_DEFAULT"
+            android:writePermission="${pluginApiAuthority}.permission.PROVIDER_DEFAULT"
             android:authorities="${pluginApiAuthority}"
             android:exported="true"
             android:grantUriPermissions="false">

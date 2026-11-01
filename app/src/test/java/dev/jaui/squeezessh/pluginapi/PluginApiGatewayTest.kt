@@ -368,4 +368,43 @@ class PluginApiGatewayTest : DatabaseTestCase() {
 
         assertThat(auditLog.observeRecent().first()).hasSize(1)
     }
+
+    // --- Pfade und Rechte ---------------------------------------------------------------
+
+    @Test
+    fun `ein leeres Pfadsegment trifft kein Modell`() = runTest {
+        connections.create(
+            ConnectionEntity(nickname = null, address = "geheim", createdAt = 0, updatedAt = 0),
+        )
+
+        assertThat(gateway.query(uri("/connections"), caller)).isNull()
+        assertThat(gateway.query(uri("connections/"), caller)).isNull()
+        assertThat(gateway.mimeTypeOf(uri("/connections"))).isNull()
+        assertThat(gateway.update(uri("/connections/x"), ContentValues(), caller)).isEqualTo(0)
+    }
+
+    @Test
+    fun `jedes Modell verlangt seine eigene Permission`() {
+        val auth = PluginContract.AUTHORITY
+        assertThat(gateway.requiredPermission(uri("connections"), write = false))
+            .isEqualTo("$auth.permission.READ_CONNECTIONS")
+        assertThat(gateway.requiredPermission(uri("connections/x"), write = true))
+            .isEqualTo("$auth.permission.WRITE_CONNECTIONS")
+        assertThat(gateway.requiredPermission(uri("connectiongroupmemberships"), write = true))
+            .isEqualTo("$auth.permission.WRITE_CONNECTION_GROUPS")
+        assertThat(gateway.requiredPermission(uri("portforwards"), write = false))
+            .isEqualTo("$auth.permission.READ_PORT_FORWARDS")
+        assertThat(gateway.requiredPermission(uri("snippets/x"), write = false))
+            .isEqualTo("$auth.permission.READ_SNIPPETS")
+        assertThat(gateway.requiredPermission(uri("pluginlog"), write = false))
+            .isEqualTo("$auth.permission.READ_PLUGIN_LOG")
+    }
+
+    @Test
+    fun `ohne passenden Pfad gibt es keine Permission und damit keinen Zugriff`() {
+        assertThat(gateway.requiredPermission(uri("/connections"), write = false)).isNull()
+        assertThat(gateway.requiredPermission(uri("snippets/"), write = true)).isNull()
+        assertThat(gateway.requiredPermission(uri("unbekannt"), write = false)).isNull()
+        assertThat(gateway.requiredPermission(uri("pluginlog"), write = true)).isNull()
+    }
 }
